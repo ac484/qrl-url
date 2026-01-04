@@ -1,0 +1,47 @@
+# cloudbuild.yaml
+# Minimal Cloud Build for qrl-api
+# Build Docker image, push to Artifact Registry, deploy to Cloud Run
+
+substitutions:
+  _IMAGE_URI: "asia-southeast1-docker.pkg.dev/qrl-api/qrl-trading-api/qrl-trading-api:latest"
+
+steps:
+  # 1️⃣ Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_IMAGE_URI}'
+      - '.'
+
+  # 2️⃣ Push Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_IMAGE_URI}'
+
+  # 3️⃣ Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'qrl-trading-api'
+      - '--image=${_IMAGE_URI}'
+      - '--region=asia-southeast1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      # Resource limits
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=10'
+      - '--concurrency=80'
+      - '--timeout=300s'
+      # Startup configuration - enable CPU boost for faster cold starts
+      - '--cpu-boost'
+      # Environment variables from Secret Manager
+      - '--set-secrets=MEXC_API_KEY=mexc-api-key:latest,MEXC_SECRET_KEY=mexc-secret-key:latest,REDIS_URL=redis-url:latest'
+
+# Timeout for the entire build
+timeout: 1200s

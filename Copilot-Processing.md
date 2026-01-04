@@ -1,0 +1,1 @@
+Issue: Update test buy/sell buttons behavior - place 1-unit orders at best bid/ask last level instead of 70%/130% price. Ensure cleanup and completeness; verify code not relying on docs; stop if unusable.

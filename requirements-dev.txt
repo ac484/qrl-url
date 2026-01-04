@@ -1,0 +1,9 @@
+# Linting / formatting
+black==23.12.1
+ruff==0.3.7
+
+# Static typing
+mypy==1.10.0
+
+# Complexity metrics
+radon==6.0.1
