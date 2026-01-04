@@ -11,31 +11,32 @@ summary: '設計以 Context7 查詢 MEXC V3 API 並符合 DDD 邊界的規劃文
 post_date: '2026-01-04'
 ---
 
-## 目標與範圍
+## 目標與範圍（僅 QRL/USDT、子帳戶）
 - 用 Context7 取得並校驗 MEXC V3 API 規格，形成可重複更新的資料來源。
+- 僅覆蓋 MEXC 子帳戶、單一交易對 QRL/USDT，避免多資產/多帳戶的複雜度。
 - 全程遵守 `.github/Boundary.md` 的分層與 async context 管理要求。
 - 與 `qrl_usdt_trading_domain.md` 的 VO、事件、實體對齊，作為實作藍圖。
 
 ## Context7 查詢工作流
 1) `resolve-library-id` 搜尋「mexc api v3」。  
 2) `get-library-docs` 抽取 REST/WS 端點、簽名、速率限制、錯誤碼。  
-3) 對應到 Infrastructure Ports（回傳 primitives），Application 轉 VO/Entities。  
+3) 只挑選 QRL/USDT 與子帳戶相關端點；對應到 Infrastructure Ports（回傳 primitives），Application 轉 VO/Entities。  
 4) Markdown 紀錄來源版本與拉取時間，供差異比對。
 
-## 分層落地計畫
+## 分層落地計畫（簡化版）
 - Interface：僅處理 DTO/路由與 HTTP/Task 入口，不進行交易決策。
-- Application：為每個 MEXC 功能提供 Use Case，內部 `async with mexc_client`。
-- Domain：擴充 VO/Events 以覆蓋手續費、滑點、曝險、訂單狀態，保持純 Python 驗證。
+- Application：為子帳戶的單一交易對提供 Use Case，內部 `async with mexc_client`。
+- Domain：VO/Events 聚焦 QRL/USDT，下單量/價格/滑點驗證保持純 Python。
 - Infrastructure：`infrastructure/external/mexc` 客戶端與端點定義，簽名、重試、速率限制，回傳 primitives。
 
-## MEXC V3 覆蓋清單（優先級）
-1. 現貨交易：下單、查單、撤單、訂單列表、成交明細。  
-2. 資金餘額：帳戶餘額、資產列表。  
-3. 行情：深度、Ticker、Kline、24h 統計。  
+## MEXC V3 覆蓋清單（僅 QRL/USDT + 子帳戶）
+1. 現貨交易：下單、查單、撤單、訂單列表、成交明細（限 QRL/USDT）。  
+2. 資金餘額：子帳戶餘額與資產列表（過濾 QRL/USDT 相關）。  
+3. 行情：深度、Ticker、Kline、24h 統計（僅 QRL/USDT）。  
 4. 系統：時間同步、速率限制檢查與錯誤碼映射。  
-5. WebSocket：Ticker/Kline/訂單回報的連線與自動重連策略。
+5. WebSocket：QRL/USDT 的 Ticker/Kline/訂單回報，自動重連。
 
-## 文件與程式結構樹（規劃稿）
+## 文件與程式結構樹（規劃稿，避免過度複雜）
 ```
 docs/
   mexc-context7-design.md        # 本文件
