@@ -12,6 +12,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional in production images
         return None
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 # Ensure src is on sys.path when running `python main.py` directly (e.g., Cloud Run, local)
@@ -38,6 +39,10 @@ def create_app() -> FastAPI:
         title="QRL/USDT Trading Bot",
         version="0.1.0",
     )
+
+    static_dir = Path(__file__).parent / "src" / "app" / "interfaces" / "http" / "pages" / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
     app.include_router(account_routes.router, prefix="/api/account", tags=["account"])
     app.include_router(market_routes.router, prefix="/api/market", tags=["market"])

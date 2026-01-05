@@ -2,10 +2,94 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Dashboard</title>
+    <title>QRL/USDT Dashboard</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
   <body>
-    <h1>Dashboard Placeholder</h1>
+    <h1>QRL/USDT 即時價格與 K 線</h1>
+    <div class="grid">
+      <div class="card">
+        <div class="price-row"><span class="label">Bid</span><span id="bid" class="value">--</span></div>
+        <div class="price-row"><span class="label">Ask</span><span id="ask" class="value">--</span></div>
+        <div class="price-row"><span class="label">Last</span><span id="last" class="value">--</span></div>
+        <div class="price-row"><span class="label">Updated</span><span id="timestamp" class="value">--</span></div>
+      </div>
+      <div class="card">
+        <canvas id="klineChart" height="240"></canvas>
+      </div>
+    </div>
+
+    <script>
+      const priceUrl = "/api/price/qrlusdt";
+      const klineUrl = "/api/kline/qrlusdt/1m?limit=50";
+      const ctx = document.getElementById("klineChart").getContext("2d");
+
+      let chart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: "Close",
+              data: [],
+              borderColor: "#2196f3",
+              fill: false,
+              tension: 0.2,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              display: true,
+              ticks: { maxTicksLimit: 8 },
+            },
+            y: {
+              display: true,
+              beginAtZero: false,
+            },
+          },
+        },
+      });
+
+      function setPrice(data) {
+        document.getElementById("bid").textContent = data.bid || "--";
+        document.getElementById("ask").textContent = data.ask || "--";
+        document.getElementById("last").textContent = data.last || "--";
+        document.getElementById("timestamp").textContent = data.timestamp || "--";
+      }
+
+      function setKlines(items) {
+        const labels = items.map((k) => new Date(k.timestamp).toLocaleTimeString());
+        const closes = items.map((k) => parseFloat(k.close));
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = closes;
+        chart.update();
+      }
+
+      async function refresh() {
+        try {
+          const [priceResp, klineResp] = await Promise.all([fetch(priceUrl), fetch(klineUrl)]);
+          if (priceResp.ok) setPrice(await priceResp.json());
+          if (klineResp.ok) setKlines(await klineResp.json());
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      // Seed with sample data so the page renders even without backend
+      setPrice({ bid: "0.1000", ask: "0.1010", last: "0.1005", timestamp: new Date().toISOString() });
+      setKlines(
+        Array.from({ length: 20 }, (_, i) => ({
+          close: (0.095 + i * 0.0005).toFixed(4),
+          timestamp: new Date(Date.now() - (20 - i) * 60000).toISOString(),
+        }))
+      );
+
+      refresh();
+      setInterval(refresh, 10000);
+    </script>
   </body>
 </html>
-
