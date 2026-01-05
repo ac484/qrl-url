@@ -8,7 +8,6 @@ from src.app.domain.value_objects.order_status import OrderStatus
 from src.app.domain.value_objects.quantity import Quantity
 from src.app.domain.value_objects.side import Side
 from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.ticker import Ticker
 from src.app.domain.value_objects.timestamp import Timestamp
 from src.app.domain.value_objects.trade_id import TradeId
 
@@ -23,14 +22,11 @@ def map_rest_order_dto_to_domain(dto: dict) -> Order:
         price=Decimal(str(dto.get("price", "0"))),
         quantity=Quantity(Decimal(str(dto.get("origQty", "0")))),
         created_at=Timestamp(
-            datetime.fromtimestamp(
-                int(dto.get("time", 0)) / 1000, tz=timezone.utc
-            )
+            datetime.fromtimestamp(int(dto.get("time", 0)) / 1000, tz=timezone.utc)
         ),
         updated_at=Timestamp(
             datetime.fromtimestamp(
-                int(dto.get("updateTime", dto.get("time", 0))) / 1000,
-                tz=timezone.utc,
+                int(dto.get("updateTime", dto.get("time", 0))) / 1000, tz=timezone.utc
             )
         )
         if dto.get("updateTime")
@@ -52,15 +48,4 @@ def map_rest_trade_dto_to_domain(dto: dict) -> Trade:
         timestamp=Timestamp(
             datetime.fromtimestamp(int(dto.get("time", 0)) / 1000, tz=timezone.utc)
         ),
-    )
-
-
-def map_ws_ticker_event_to_domain(event: dict) -> Ticker:
-    """Map MEXC WS ticker event to Ticker VO."""
-    return Ticker(
-        symbol=Symbol(str(event.get("symbol", "QRLUSDT"))),
-        last_price=Decimal(str(event.get("last", "0"))),
-        bid_price=Decimal(str(event.get("bidPrice", "0"))),
-        ask_price=Decimal(str(event.get("askPrice", "0"))),
-        ts=datetime.fromtimestamp(int(event.get("ts", 0)) / 1000, tz=timezone.utc),
     )

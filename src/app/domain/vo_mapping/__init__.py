@@ -1,1 +1,0 @@
-"""Placeholder VO mapping module."""
