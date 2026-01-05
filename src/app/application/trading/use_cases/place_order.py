@@ -57,7 +57,7 @@ class PlaceOrderUseCase:
             side=Side(data.side),
             order_type=OrderType(data.order_type),
             quantity=Quantity(data.quantity),
-            price=Price(data.price) if data.price is not None else None,
+            price=Price.from_single(data.price) if data.price is not None else None,
             time_in_force=TimeInForce(data.time_in_force) if data.time_in_force else None,
             client_order_id=data.client_order_id,
         )

@@ -9,15 +9,19 @@ from src.app.domain.value_objects.symbol import Symbol
 from src.app.domain.value_objects.ticker import Ticker
 from src.app.domain.value_objects.timestamp import Timestamp
 from src.app.domain.value_objects.trade_id import TradeId
+from src.app.domain.value_objects.kline import KLine
+from src.app.domain.value_objects.sub_account_id import SubAccountId
 
 __all__ = [
     "OrderId",
     "OrderStatus",
     "Price",
+    "KLine",
     "Quantity",
     "Side",
     "Symbol",
     "Ticker",
     "Timestamp",
     "TradeId",
+    "SubAccountId",
 ]

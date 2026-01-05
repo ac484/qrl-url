@@ -122,3 +122,14 @@ class MexcRestClient:
         if isinstance(result, list):
             return result
         return []
+
+    async def ticker_24h(self, *, symbol: str) -> dict[str, Any]:
+        params = {"symbol": symbol}
+        return await self._request("GET", "/api/v3/ticker/24hr", params=params)
+
+    async def klines(self, *, symbol: str, interval: str, limit: int = 100) -> list[list[Any]]:
+        params = {"symbol": symbol, "interval": interval, "limit": limit}
+        result = await self._request("GET", "/api/v3/klines", params=params)
+        if isinstance(result, list):
+            return result
+        return []

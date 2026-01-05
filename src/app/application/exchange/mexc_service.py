@@ -19,6 +19,7 @@ from src.app.infrastructure.exchange.mexc.mappers import (
     trade_from_api,
 )
 from src.app.infrastructure.exchange.mexc.rest_client import MexcRestClient
+from src.app.infrastructure.exchange.mexc_api_client import MexcApiClient
 from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
 
@@ -60,13 +61,14 @@ class MexcService:
 
     def __init__(self, rest_client: MexcRestClient):
         self._rest_client = rest_client
+        self._api_client = MexcApiClient(rest_client)
 
     async def __aenter__(self) -> "MexcService":
-        await self._rest_client.__aenter__()
+        await self._api_client.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self._rest_client.__aexit__(exc_type, exc, tb)
+        await self._api_client.__aexit__(exc_type, exc, tb)
 
     async def get_server_time(self) -> Timestamp:
         payload = await self._rest_client.get_server_time()
@@ -84,7 +86,7 @@ class MexcService:
             "side": request.side.value,
             "order_type": request.order_type.value,
             "quantity": _to_str(request.quantity.value),
-            "price": _to_str(request.price.value) if request.price else None,
+            "price": _to_str(request.price.last) if request.price else None,
             "time_in_force": request.time_in_force.value if request.time_in_force else None,
             "client_order_id": request.client_order_id,
         }
@@ -116,6 +118,21 @@ class MexcService:
     async def list_trades(self, symbol: Symbol) -> list[Trade]:
         response = await self._rest_client.list_trades(symbol=_symbol_value(symbol))
         return [trade_from_api(item) for item in response]
+
+    async def get_price(self, symbol: Symbol) -> Price:
+        from src.app.domain.entities.trading_pair import TradingPair
+
+        base = symbol.value.replace("/", "").upper().removesuffix("USDT")
+        tp = TradingPair(base_currency=base, quote_currency="USDT")
+        return await self._api_client.get_price(tp)
+
+    async def get_kline(self, symbol: Symbol, interval: str, limit: int = 100) -> list["KLine"]:
+        from src.app.domain.entities.trading_pair import TradingPair
+        from src.app.domain.value_objects.kline import KLine
+
+        base = symbol.value.replace("/", "").upper().removesuffix("USDT")
+        tp = TradingPair(base_currency=base, quote_currency="USDT")
+        return await self._api_client.get_klines(tp, interval=interval, limit=limit)
 
 
 def build_mexc_service(settings: MexcSettings) -> MexcService:
