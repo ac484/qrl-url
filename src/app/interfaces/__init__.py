@@ -1,6 +1,12 @@
 from fastapi import FastAPI
 
-from src.app.interfaces.http import account_routes, market_routes, system_routes, trading_routes, ws_routes
+from src.app.interfaces.http.api import (
+    account_routes,
+    market_routes,
+    system_routes,
+    trading_routes,
+    ws_routes,
+)
 
 
 def register_all_routers(app: FastAPI) -> None:

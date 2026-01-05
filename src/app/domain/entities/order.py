@@ -23,8 +23,8 @@ class Order:
     status: OrderStatus
     price: Decimal
     quantity: Quantity
-    time_in_force: TimeInForce | None = None
     created_at: Timestamp
+    time_in_force: TimeInForce | None = None
     client_order_id: str | None = None
     executed_quantity: Decimal | None = None
     cumulative_quote_quantity: Decimal | None = None

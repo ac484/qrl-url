@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from src.app.application.market.use_cases.get_depth import GetDepthUseCase
 from src.app.application.market.use_cases.get_kline import GetKlineUseCase
-from src.app.application.market.use_cases.get_stats24h import GetStats24HUseCase
+from src.app.application.market.use_cases.get_stats24h import GetStats24hUseCase
 from src.app.application.market.use_cases.get_ticker import GetTickerUseCase
 
 router = APIRouter()
@@ -32,6 +32,5 @@ async def get_kline():
 @router.get("/stats24h")
 async def get_stats_24h():
     """Get 24h statistics for QRL/USDT."""
-    usecase = GetStats24HUseCase()
+    usecase = GetStats24hUseCase()
     return await usecase.execute()
-
