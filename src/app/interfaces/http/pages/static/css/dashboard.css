@@ -66,6 +66,23 @@ button {
   cursor: pointer;
 }
 
+.side-toggle {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.side-btn {
+  background: #e0e0e0;
+  color: #333;
+  border: 1px solid #d0d0d0;
+}
+
+.side-btn.active {
+  background: #2196f3;
+  color: #fff;
+  border-color: #2196f3;
+}
+
 .order-result {
   margin-top: 8px;
   color: #333;

@@ -24,10 +24,11 @@
       <form id="orderForm">
         <div class="form-row">
           <label>方向</label>
-          <select name="side">
-            <option value="BUY">BUY</option>
-            <option value="SELL">SELL</option>
-          </select>
+          <div class="side-toggle" role="group" aria-label="Side">
+            <button type="button" data-side="BUY" class="side-btn active">買入</button>
+            <button type="button" data-side="SELL" class="side-btn">賣出</button>
+          </div>
+          <input type="hidden" name="side" value="BUY" />
         </div>
         <div class="form-row">
           <label>類型</label>
@@ -128,6 +129,15 @@
 
       refresh();
       setInterval(refresh, 10000);
+
+      // Side toggle (BUY/SELL buttons)
+      document.querySelectorAll(".side-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".side-btn").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          document.querySelector('input[name="side"]').value = btn.dataset.side;
+        });
+      });
 
       document.getElementById("orderForm").addEventListener("submit", async (e) => {
         e.preventDefault();
