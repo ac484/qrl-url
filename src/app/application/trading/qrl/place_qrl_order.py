@@ -15,7 +15,7 @@ class PlaceQrlOrder:
         *,
         side: str,
         order_type: str,
-        price: QrlPrice,
+        price: QrlPrice | None,
         quantity: QrlQuantity,
         time_in_force: str | None = "GTC",
         client_order_id: str | None = None,
@@ -24,7 +24,7 @@ class PlaceQrlOrder:
             return await client.create_order(
                 side=side,
                 order_type=order_type,
-                price=str(price.value),
+                price=str(price.value) if price else None,
                 quantity=str(quantity.value),
                 time_in_force=time_in_force,
                 client_order_id=client_order_id,

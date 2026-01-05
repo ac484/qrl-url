@@ -24,7 +24,7 @@ if SRC.exists() and str(SRC) not in sys.path:
     sys.path.append(str(SRC))
 
 from src.app.interfaces.http.api import account_routes, market_routes, system_routes, trading_routes, ws_routes
-from src.app.interfaces.http.api import trading_api
+from src.app.interfaces.http.api import qrl_routes, trading_api
 from src.app.interfaces.http.pages import dashboard_routes
 from src.app.application.exchange.mexc_service import MexcService
 from src.app.infrastructure.exchange.mexc.rest_client import MexcRestClient
@@ -48,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(market_routes.router, prefix="/api/market", tags=["market"])
     app.include_router(system_routes.router, prefix="/api/system", tags=["system"])
     app.include_router(trading_routes.router, prefix="/api/trading", tags=["trading"])
+    app.include_router(qrl_routes.router, prefix="/api/qrl", tags=["qrl"])
     app.include_router(trading_api.router, tags=["price"])
     app.include_router(ws_routes.router, prefix="/ws", tags=["ws"])
     app.include_router(dashboard_routes.router, tags=["pages"])

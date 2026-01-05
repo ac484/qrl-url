@@ -59,9 +59,9 @@
     </div>
 
     <script>
-      const priceUrl = "/api/price/qrlusdt";
-      const klineUrl = "/api/kline/qrlusdt/1m?limit=50";
-      const orderUrl = "/api/trading/orders";
+      const priceUrl = "/api/qrl/price";
+      const klineUrl = "/api/qrl/kline?interval=1m&limit=50";
+      const orderUrl = "/api/qrl/orders";
       const ctx = document.getElementById("klineChart").getContext("2d");
 
       let chart = new Chart(ctx, {
@@ -97,7 +97,7 @@
         document.getElementById("bid").textContent = data.bid || "--";
         document.getElementById("ask").textContent = data.ask || "--";
         document.getElementById("last").textContent = data.last || "--";
-        document.getElementById("timestamp").textContent = data.timestamp || "--";
+        document.getElementById("timestamp").textContent = data.timestamp || new Date().toISOString();
       }
 
       function setKlines(items) {
