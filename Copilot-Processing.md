@@ -1,1 +1,1 @@
-User request: 使用contex7查詢mexc v3 api 搭配 .github\Boundary.md .github\copilot-instructions.md .github\qrl_usdt_trading_domain.md 先在docs把設計與規劃文件做出來,須包含完整結構樹
+User request: Implement problem statement requirements (deduplicate main.py, align Dockerfile, update cloudbuild.yaml, remove Redis, add Mexc V3 API client with DDD value objects/entities/service and example usage) in repository 'ac484/qrl-url'. Ensure minimal changes per instructions.
