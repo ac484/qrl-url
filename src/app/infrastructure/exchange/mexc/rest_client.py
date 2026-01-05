@@ -35,6 +35,8 @@ class MexcRestClient:
 
     def _signed_params(self, params: dict[str, Any]) -> dict[str, Any]:
         payload = {k: v for k, v in params.items() if v is not None}
+        if self._settings.sub_account_id is not None:
+            payload.setdefault("subAccountId", self._settings.sub_account_id)
         payload.setdefault("timestamp", int(time.time() * 1000))
         payload.setdefault("recvWindow", self._settings.recv_window)
         query = urlencode(payload, doseq=True)

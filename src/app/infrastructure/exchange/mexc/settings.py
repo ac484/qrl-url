@@ -10,5 +10,6 @@ class MexcSettings(BaseSettings):
     base_url: str = Field(default="https://api.mexc.com", alias="MEXC_BASE_URL")
     recv_window: int = Field(default=5000, alias="MEXC_RECV_WINDOW")
     timeout: int = Field(default=10, alias="MEXC_TIMEOUT")
+    sub_account_id: int | None = Field(default=None, alias="SUB_ACCOUNT_ID")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

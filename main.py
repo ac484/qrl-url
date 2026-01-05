@@ -69,7 +69,7 @@ def _run_server() -> None:
     """Start the uvicorn server using environment configuration."""
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8080"))
-    uvicorn.run("main:app", host=host, port=port, reload=False)
+    uvicorn.run(app, host=host, port=port, reload=False)
 
 
 if __name__ == "__main__":
