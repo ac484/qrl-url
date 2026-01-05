@@ -1,1 +1,1 @@
-"""Account use cases."""
+# Account bounded context.
