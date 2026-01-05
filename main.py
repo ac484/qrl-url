@@ -51,6 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(trading_api.router, tags=["price"])
     app.include_router(ws_routes.router, prefix="/ws", tags=["ws"])
     app.include_router(dashboard_routes.router, tags=["pages"])
+    app.get("/", response_class=dashboard_routes.HTMLResponse)(dashboard_routes.dashboard)
 
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
