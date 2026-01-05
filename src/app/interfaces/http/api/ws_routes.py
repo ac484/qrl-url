@@ -1,7 +1,7 @@
 from fastapi import APIRouter, WebSocket
 
-from src.app.application.market.get_ticker import GetTickerUseCase
-from src.app.application.trading.list_orders import ListOrdersUseCase
+from src.app.application.market.use_cases.get_ticker import GetTickerUseCase
+from src.app.application.trading.use_cases.list_orders import ListOrdersUseCase
 
 router = APIRouter()
 
@@ -22,3 +22,4 @@ async def order_stream(websocket: WebSocket):
     usecase = ListOrdersUseCase()
     await usecase.execute()  # TODO: stream data
     await websocket.close()
+

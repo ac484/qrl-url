@@ -1,10 +1,10 @@
 from fastapi import APIRouter
 
-from src.app.application.trading.cancel_order import CancelOrderUseCase
-from src.app.application.trading.get_order import GetOrderUseCase
-from src.app.application.trading.list_orders import ListOrdersUseCase
-from src.app.application.trading.list_trades import ListTradesUseCase
-from src.app.application.trading.place_order import PlaceOrderUseCase
+from src.app.application.trading.use_cases.cancel_order import CancelOrderUseCase
+from src.app.application.trading.use_cases.get_order import GetOrderUseCase
+from src.app.application.trading.use_cases.list_orders import ListOrdersUseCase
+from src.app.application.trading.use_cases.list_trades import ListTradesUseCase
+from src.app.application.trading.use_cases.place_order import PlaceOrderUseCase
 
 router = APIRouter()
 
@@ -42,3 +42,4 @@ async def list_trades():
     """List recent trades."""
     usecase = ListTradesUseCase()
     return await usecase.execute()
+

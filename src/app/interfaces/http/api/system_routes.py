@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
-from src.app.application.system.get_server_time import GetServerTimeUseCase
-from src.app.application.system.ping import PingUseCase
+from src.app.application.system.use_cases.get_server_time import GetServerTimeUseCase
+from src.app.application.system.use_cases.ping import PingUseCase
 
 router = APIRouter()
 
@@ -18,3 +18,4 @@ async def get_server_time():
     """Get server time."""
     usecase = GetServerTimeUseCase()
     return await usecase.execute()
+
