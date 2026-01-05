@@ -2,6 +2,8 @@
 
 import asyncio
 import os
+import sys
+from pathlib import Path
 
 try:
     from dotenv import load_dotenv
@@ -11,6 +13,14 @@ except ModuleNotFoundError:  # pragma: no cover - optional in production images
 
 from fastapi import FastAPI
 import uvicorn
+
+# Ensure src is on sys.path when running `python main.py` directly (e.g., Cloud Run, local)
+ROOT = Path(__file__).parent
+SRC = ROOT / "src"
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+if SRC.exists() and str(SRC) not in sys.path:
+    sys.path.append(str(SRC))
 
 from src.app.interfaces.http.api import account_routes, market_routes, system_routes, trading_routes, ws_routes
 from src.app.interfaces.http.api import trading_api
