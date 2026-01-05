@@ -14,6 +14,7 @@
         <div class="price-row"><span class="label">Ask</span><span id="ask" class="value">--</span></div>
         <div class="price-row"><span class="label">Last</span><span id="last" class="value">--</span></div>
         <div class="price-row"><span class="label">Updated</span><span id="timestamp" class="value">--</span></div>
+        <div class="price-row error" id="price-error" aria-live="polite"></div>
       </div>
       <div class="card">
         <canvas id="klineChart" height="240"></canvas>
@@ -24,6 +25,7 @@
         <div class="price-row"><span class="label">QRL 冻结</span><span id="bal-qrl-locked" class="value">--</span></div>
         <div class="price-row"><span class="label">USDT 可用</span><span id="bal-usdt-free" class="value">--</span></div>
         <div class="price-row"><span class="label">USDT 冻结</span><span id="bal-usdt-locked" class="value">--</span></div>
+        <div class="price-row error" id="balance-error" aria-live="polite"></div>
       </div>
     </div>
     <div class="card order-card">
@@ -102,6 +104,7 @@
       });
 
       function setPrice(data) {
+        document.getElementById("price-error").textContent = "";
         document.getElementById("bid").textContent = data.bid ?? "--";
         document.getElementById("ask").textContent = data.ask ?? "--";
         document.getElementById("last").textContent = data.last ?? "--";
@@ -124,6 +127,7 @@
       }
 
       function setBalances(payload) {
+        document.getElementById("balance-error").textContent = "";
         const balances = payload?.balances || [];
         const qrl = balances.find((b) => b.asset === "QRL") || { free: "--", locked: "--" };
         const usdt = balances.find((b) => b.asset === "USDT") || { free: "--", locked: "--" };
@@ -140,11 +144,23 @@
             fetch(klineUrl),
             fetch(balanceUrl),
           ]);
-          if (priceResp.ok) setPrice(await priceResp.json());
+          if (priceResp.ok) {
+            setPrice(await priceResp.json());
+          } else {
+            const data = await priceResp.json().catch(() => ({}));
+            document.getElementById("price-error").textContent = data.detail || "價格取得失敗";
+          }
           if (klineResp.ok) setKlines(await klineResp.json());
-          if (balanceResp.ok) setBalances(await balanceResp.json());
+          if (balanceResp.ok) {
+            setBalances(await balanceResp.json());
+          } else {
+            const data = await balanceResp.json().catch(() => ({}));
+            document.getElementById("balance-error").textContent = data.detail || "餘額取得失敗";
+          }
         } catch (err) {
           console.error(err);
+          document.getElementById("price-error").textContent = "連線錯誤";
+          document.getElementById("balance-error").textContent = "連線錯誤";
         }
       }
 

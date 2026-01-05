@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from src.app.application.market.qrl.get_qrl_depth import GetQrlDepth
 from src.app.application.market.qrl.get_qrl_kline import GetQrlKline
@@ -24,26 +24,35 @@ def _client() -> QrlRestClient:
 @router.get("/price")
 async def qrl_price():
     usecase = GetQrlPrice(_client())
-    data = await usecase.execute()
-    data["timestamp"] = data.get("timestamp") or None
-    return data
+    try:
+        data = await usecase.execute()
+        data["timestamp"] = data.get("timestamp") or None
+        return data
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL price: {exc}") from exc
 
 
 @router.get("/kline")
 async def qrl_kline(interval: str = Query(default="1m"), limit: int = Query(default=50, ge=1, le=500)):
     usecase = GetQrlKline(_client(), interval=interval, limit=limit)
-    raw = await usecase.execute()
-    normalized = [
-        {"timestamp": item[0], "open": item[1], "high": item[2], "low": item[3], "close": item[4], "volume": item[5]}
-        for item in raw
-    ]
-    return normalized
+    try:
+        raw = await usecase.execute()
+        normalized = [
+            {"timestamp": item[0], "open": item[1], "high": item[2], "low": item[3], "close": item[4], "volume": item[5]}
+            for item in raw
+        ]
+        return normalized
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL klines: {exc}") from exc
 
 
 @router.get("/depth")
 async def qrl_depth(limit: int = Query(default=50, ge=5, le=1000)):
     usecase = GetQrlDepth(_client(), limit=limit)
-    return await usecase.execute()
+    try:
+        return await usecase.execute()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL depth: {exc}") from exc
 
 
 @router.post("/orders")
