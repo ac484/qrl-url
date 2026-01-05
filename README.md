@@ -7,15 +7,11 @@ MEXC API 整合的 QRL/USDT 自動化交易機器人
 ### 完全異步設計
 - **Web 框架**: FastAPI + Uvicorn
 - **HTTP 客戶端**: httpx (async)
-- **Redis 客戶端**: redis.asyncio
 - **WebSocket**: websockets (async)
 
 ### 核心特性
 - ✅ MEXC API v3 完整整合
 - ✅ 異步 REST API 調用
-- ✅ Redis 狀態管理與智能快取
-- ✅ 全面的 MEXC v3 API 數據快取（市場數據、帳戶數據、訂單數據）
-- ✅ 可配置的快取 TTL（減少 API 調用、提升性能）
 - ✅ 6 階段交易執行系統
 - ✅ 移動平均線交叉策略
 - ✅ 多層倉位管理
@@ -25,6 +21,8 @@ MEXC API 整合的 QRL/USDT 自動化交易機器人
 - ✅ **WebSocket 自動重連** - 數據流心跳監測 + 斷線恢復
 - ✅ **多時間框架聚合** - 單一 WS 支援多策略
 - ✅ **回測/模擬/實盤** - 同一程式碼支援所有模式
+
+> 注意：Redis 快取元件已移除，文檔中提到的 Redis 任務或端點僅供參考，後續將持續更新。
 
 ### 架構設計
 
@@ -58,20 +56,8 @@ cp .env.example .env
 # 編輯 .env 文件，設置你的 MEXC API 密鑰
 ```
 
-### 3. 啟動 Redis
-
-**選項 1: 使用 Redis Cloud (推薦)**
-```bash
-# 在 .env 文件中設置 REDIS_URL
-REDIS_URL=redis://default:your_password@your-redis-cloud.com:6379/0
-```
-
-詳細設定請參考 [REDIS_CLOUD_SETUP.md](REDIS_CLOUD_SETUP.md)
-
-**選項 2: 本地 Redis**
-```bash
-docker run -d -p 6379:6379 redis:7-alpine
-```
+### 3. 環境說明
+（已移除 Redis 依賴，無需啟動 Redis 服務）
 
 ### 4. 運行應用
 

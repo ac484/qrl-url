@@ -41,7 +41,7 @@ steps:
       # Startup configuration - enable CPU boost for faster cold starts
       - '--cpu-boost'
       # Environment variables from Secret Manager
-      - '--set-secrets=MEXC_API_KEY=mexc-api-key:latest,MEXC_SECRET_KEY=mexc-secret-key:latest,REDIS_URL=redis-url:latest'
+      - '--set-secrets=MEXC_API_KEY=mexc-api-key:latest,MEXC_SECRET_KEY=mexc-secret-key:latest'
 
 # Timeout for the entire build
 timeout: 1200s
