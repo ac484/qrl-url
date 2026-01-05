@@ -18,6 +18,13 @@
       <div class="card">
         <canvas id="klineChart" height="240"></canvas>
       </div>
+      <div class="card">
+        <h2>餘額</h2>
+        <div class="price-row"><span class="label">QRL 可用</span><span id="bal-qrl-free" class="value">--</span></div>
+        <div class="price-row"><span class="label">QRL 冻结</span><span id="bal-qrl-locked" class="value">--</span></div>
+        <div class="price-row"><span class="label">USDT 可用</span><span id="bal-usdt-free" class="value">--</span></div>
+        <div class="price-row"><span class="label">USDT 冻结</span><span id="bal-usdt-locked" class="value">--</span></div>
+      </div>
     </div>
     <div class="card order-card">
       <h2>下單</h2>
@@ -62,6 +69,7 @@
       const priceUrl = "/api/qrl/price";
       const klineUrl = "/api/qrl/kline?interval=1m&limit=50";
       const orderUrl = "/api/qrl/orders";
+      const balanceUrl = "/api/account/balance";
       const ctx = document.getElementById("klineChart").getContext("2d");
 
       let chart = new Chart(ctx, {
@@ -94,10 +102,17 @@
       });
 
       function setPrice(data) {
-        document.getElementById("bid").textContent = data.bid || "--";
-        document.getElementById("ask").textContent = data.ask || "--";
-        document.getElementById("last").textContent = data.last || "--";
-        document.getElementById("timestamp").textContent = data.timestamp || new Date().toISOString();
+        document.getElementById("bid").textContent = data.bid ?? "--";
+        document.getElementById("ask").textContent = data.ask ?? "--";
+        document.getElementById("last").textContent = data.last ?? "--";
+        const ts = data.timestamp;
+        const parsed =
+          typeof ts === "number"
+            ? new Date(ts)
+            : ts
+            ? new Date(ts)
+            : new Date();
+        document.getElementById("timestamp").textContent = parsed.toISOString();
       }
 
       function setKlines(items) {
@@ -108,11 +123,26 @@
         chart.update();
       }
 
+      function setBalances(payload) {
+        const balances = payload?.balances || [];
+        const qrl = balances.find((b) => b.asset === "QRL") || { free: "--", locked: "--" };
+        const usdt = balances.find((b) => b.asset === "USDT") || { free: "--", locked: "--" };
+        document.getElementById("bal-qrl-free").textContent = qrl.free;
+        document.getElementById("bal-qrl-locked").textContent = qrl.locked;
+        document.getElementById("bal-usdt-free").textContent = usdt.free;
+        document.getElementById("bal-usdt-locked").textContent = usdt.locked;
+      }
+
       async function refresh() {
         try {
-          const [priceResp, klineResp] = await Promise.all([fetch(priceUrl), fetch(klineUrl)]);
+          const [priceResp, klineResp, balanceResp] = await Promise.all([
+            fetch(priceUrl),
+            fetch(klineUrl),
+            fetch(balanceUrl),
+          ]);
           if (priceResp.ok) setPrice(await priceResp.json());
           if (klineResp.ok) setKlines(await klineResp.json());
+          if (balanceResp.ok) setBalances(await balanceResp.json());
         } catch (err) {
           console.error(err);
         }
