@@ -3,7 +3,12 @@
 import asyncio
 import os
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - optional in production images
+    def load_dotenv() -> None:  # type: ignore
+        return None
+
 from fastapi import FastAPI
 import uvicorn
 
