@@ -1,1 +1,1 @@
-Issue: Update test buy/sell buttons behavior - place 1-unit orders at best bid/ask last level instead of 70%/130% price. Ensure cleanup and completeness; verify code not relying on docs; stop if unusable.
+User request: 使用contex7查詢mexc v3 api 搭配 .github\Boundary.md .github\copilot-instructions.md .github\qrl_usdt_trading_domain.md 先在docs把設計與規劃文件做出來,須包含完整結構樹
