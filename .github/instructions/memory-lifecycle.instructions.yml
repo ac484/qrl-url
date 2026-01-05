@@ -1,0 +1,48 @@
+---
+description: "Universal Memory Lifecycle Instructions: development recall, stepwise dev, post-dev memory update"
+applyTo: "**"
+---
+
+# 🧠 Memory Lifecycle Instructions (通用版)
+
+## 🎯 目標
+- 適用於任何專案、語言、框架
+- 開發前：回顧現有狀態、依賴、邊界
+- 開發中：分步分析、影響模擬、逐步生成修改建議
+- 開發後：更新 Copilot Memory，保留歷史與決策
+
+## 🔄 Memory Lifecycle Steps
+
+### 1️⃣ 開發前：回顧
+- 列出所有模組 / domain / entities / ports / adapters
+- 檢查依賴方向是否正確
+- 標註違規 / 潛在風險
+- 將回顧結果存入 Copilot Memory
+
+### 2️⃣ 開發中：分步思考
+- 使用 Sequential-Thinking + Software-Planning-Tool
+- 分析每個模組 / domain / entity 的角色與依賴
+- 檢查依賴方向是否正確（禁止反向引用）
+- 生成修改 / 新增建議，分步驟優先處理最嚴重違規
+- 模擬改動對其他模組 / domain 的影響
+- 生成報告，包含邊界狀態、違規點、改正方案
+
+### 3️⃣ 開發後：更新 Memory
+- 記錄修改決策、依賴變化
+- 記錄新增 ports / entities / aggregates / adapters
+- 更新每個模組 / domain 邊界狀態
+- 標註未來開發注意事項 / 潛在風險
+
+## 💡 通用守則
+- 核心 domain / aggregates / entities 僅在 Core / Domain 層修改
+- UI / 前端只能透過 Adapter 呼叫 Core / Domain
+- SDK / 外部能力統一放 Adapter
+- 所有改動必須先拆解 (Sequential-Thinking) 再生成 step-by-step plan (Software-Planning-Tool)
+- Memory 必須全程更新，確保下一次開發參考完整歷史
+
+## ✅ 核心原則
+- 邊界明確，避免跨層引用
+- 依賴方向永遠一致：外層 → Adapter → Core
+- 開發前必須回顧，開發後必須記憶
+- Sequential-Thinking + Software-Planning-Tool 貫穿全流程
+- 適用於任何語言 / 框架 / 專案
