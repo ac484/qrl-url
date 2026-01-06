@@ -1,6 +1,98 @@
-"""Entrypoint module for running the FastAPI application via uvicorn."""
+"""Entrypoint module for the FastAPI application."""
 
-from src.app.main import app
+import asyncio
+import os
+import sys
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - optional in production images
+    def load_dotenv() -> None:  # type: ignore
+        return None
+
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+import uvicorn
+
+# Ensure src is on sys.path when running `python main.py` directly (e.g., Cloud Run, local)
+ROOT = Path(__file__).parent
+SRC = ROOT / "src"
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+if SRC.exists() and str(SRC) not in sys.path:
+    sys.path.append(str(SRC))
+
+from src.app.interfaces.http.api import account_routes, market_routes, system_routes, trading_routes, ws_routes
+from src.app.interfaces.http.api import qrl_routes, trading_api
+from src.app.interfaces.http.pages import dashboard_routes
+from src.app.application.exchange.mexc_service import MexcService
+from src.app.infrastructure.exchange.mexc.rest_client import MexcRestClient
+from src.app.infrastructure.exchange.mexc.settings import MexcSettings
+
+load_dotenv()
+
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title="QRL/USDT Trading Bot",
+        version="0.1.0",
+    )
+
+    static_dir = Path(__file__).parent / "src" / "app" / "interfaces" / "http" / "pages" / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+    app.include_router(account_routes.router, prefix="/api/account", tags=["account"])
+    app.include_router(market_routes.router, prefix="/api/market", tags=["market"])
+    app.include_router(system_routes.router, prefix="/api/system", tags=["system"])
+    app.include_router(trading_routes.router, prefix="/api/trading", tags=["trading"])
+    app.include_router(qrl_routes.router, prefix="/api/qrl", tags=["qrl"])
+    app.include_router(trading_api.router, tags=["price"])
+    app.include_router(ws_routes.router, prefix="/ws", tags=["ws"])
+    app.include_router(dashboard_routes.router, tags=["pages"])
+    app.get("/", response_class=dashboard_routes.HTMLResponse)(dashboard_routes.dashboard)
+
+    @app.get("/health", tags=["system"])
+    async def health() -> dict[str, str]:
+        """Health check endpoint used by deployment probes."""
+        return {"status": "ok"}
+
+    return app
+
+
+app = create_app()
+
+
+async def _demo_mexc_usage() -> None:
+    """Demonstrate how to initialize the MexcService and call a simple API."""
+    try:
+        settings = MexcSettings()
+    except Exception as exc:  # pragma: no cover - demonstration only
+        print(f"[demo] Unable to load MEXC credentials: {exc}")
+        return
+
+    async with MexcService(MexcRestClient(settings)) as service:
+        server_time = await service.get_server_time()
+        print(f"[demo] MEXC server time: {server_time.value.isoformat()}")
+
+
+def _should_run_demo() -> bool:
+    """Gate demo execution behind an opt-in flag."""
+    return os.getenv("RUN_MEXC_DEMO", "0") == "1"
+
+
+def _run_server() -> None:
+    """Start the uvicorn server using environment configuration."""
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8080"))
+    uvicorn.run(app, host=host, port=port, reload=False)
+
+
+if __name__ == "__main__":
+    if _should_run_demo():
+        asyncio.run(_demo_mexc_usage())
+    _run_server()
 
 __all__ = ["app"]
-

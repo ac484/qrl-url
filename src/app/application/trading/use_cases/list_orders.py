@@ -1,24 +1,19 @@
-"""
-Trading use case: list open/closed orders.
-"""
+"""Trading use case: list open/closed orders."""
 
-from dataclasses import dataclass
-from typing import Iterable
-from src.app.domain.entities.order import Order
-
-
-@dataclass
-class ListOrdersInput:
-    # TODO: add filters (status, time range, limit)
-    pass
-
-
-@dataclass
-class ListOrdersOutput:
-    orders: Iterable[Order]
+from src.app.application.exchange.mexc_service import MexcService, build_mexc_service
+from src.app.application.trading.use_cases.place_order import _serialize_order
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
 
 class ListOrdersUseCase:
-    def execute(self, data: ListOrdersInput) -> ListOrdersOutput:
-        # TODO: retrieve via port and map to domain
-        return ListOrdersOutput(orders=[])
+    settings: MexcSettings | None = None
+
+    def __init__(self, settings: MexcSettings | None = None):
+        self.settings = settings
+
+    async def execute(self, symbol: str | None = None) -> list[dict]:
+        service = build_mexc_service(self.settings or MexcSettings())
+        async with service as svc:
+            orders = await svc.list_open_orders(Symbol(symbol) if symbol else None)
+        return [_serialize_order(order) for order in orders]

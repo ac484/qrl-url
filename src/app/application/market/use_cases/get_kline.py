@@ -4,20 +4,24 @@ Market use case: get kline data for QRL/USDT.
 
 from dataclasses import dataclass
 
+from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
+from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
+
 
 @dataclass
 class GetKlineInput:
-    # TODO: interval, start/end
-    pass
-
-
-@dataclass
-class GetKlineOutput:
-    # TODO: list of candles using domain VOs
-    pass
+    interval: str = "1m"
+    limit: int = 50
 
 
 class GetKlineUseCase:
-    def execute(self, data: GetKlineInput) -> GetKlineOutput:
-        # TODO: retrieve klines via port and map
-        return GetKlineOutput()
+    """Fetch klines for the fixed QRL/USDT symbol."""
+
+    def __init__(self, settings: QrlSettings | None = None):
+        self._settings = settings or QrlSettings()
+
+    async def execute(self, data: GetKlineInput | None = None) -> list:
+        payload = data or GetKlineInput()
+        client = QrlRestClient(self._settings)
+        async with client as cli:
+            return await cli.klines(interval=payload.interval, limit=payload.limit)
