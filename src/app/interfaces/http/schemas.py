@@ -41,3 +41,5 @@ class AllocationResponse(BaseModel):
     request_id: str = Field(description="Identifier for the allocation trigger")
     status: str = Field(description="Execution status for the allocation task")
     executed_at: datetime = Field(description="UTC timestamp when the task executed")
+    action: str = Field(description="Trade action executed (BUY or SELL)")
+    order_id: str = Field(description="Order identifier returned by the exchange")
