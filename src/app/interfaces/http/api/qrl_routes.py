@@ -30,9 +30,8 @@ def _client() -> QrlRestClient:
 async def qrl_price():
     usecase = GetQrlPrice(_client())
     try:
-        data = await usecase.execute()
-        data["timestamp"] = data.get("timestamp") or None
-        return data
+        snapshot = await usecase.execute()
+        return snapshot.to_dict()
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Failed to fetch QRL price: {exc}") from exc
 
@@ -118,7 +117,7 @@ async def qrl_summary(
         for item in kline_result
     ]
     return {
-        "price": price_result,
+        "price": price_result.to_dict(),
         "klines": normalized_klines,
         "depth": depth_result,
         "balance": balance_result,
