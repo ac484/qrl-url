@@ -37,6 +37,7 @@
       console.error(ex);
     }
   }
+  window.dashboardRefresh = refresh;
 
   const wireSideToggle = () => {
     document.querySelectorAll(".side-btn").forEach((btn) => {
