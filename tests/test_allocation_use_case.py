@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 
 import pytest
+from pydantic import ValidationError
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -94,3 +95,51 @@ async def test_allocation_buys_when_usdt_exceeds_qrl():
     assert service.last_order_request.price is not None
     assert service.last_order_request.price.last == Decimal("1")
     assert service.last_order_request.quantity.value == Decimal("1")
+
+
+@pytest.mark.asyncio
+async def test_allocation_skips_when_credentials_missing():
+    validation_error = ValidationError.from_exception_data(
+        title="MexcSettings",
+        line_errors=[
+            {
+                "type": "missing",
+                "loc": ("MEXC_API_KEY",),
+                "msg": "Field required",
+                "input": {},
+            }
+        ],
+    )
+
+    def _raising_factory():
+        raise validation_error
+
+    usecase = AllocationUseCase(service_factory=_raising_factory)
+
+    result = await usecase.execute()
+
+    assert result.status == "skipped_missing_credentials"
+    assert result.action == "SKIP"
+    assert result.order_id == "N/A"
+
+
+class FailingService:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return None
+
+    async def get_account(self):
+        raise RuntimeError("boom")
+
+
+@pytest.mark.asyncio
+async def test_allocation_returns_error_when_service_raises():
+    usecase = AllocationUseCase(service_factory=lambda: FailingService())
+
+    result = await usecase.execute()
+
+    assert result.status == "error"
+    assert result.action == "FAILED"
+    assert result.order_id == "N/A"

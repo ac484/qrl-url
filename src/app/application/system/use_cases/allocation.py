@@ -6,6 +6,8 @@ from decimal import Decimal
 from typing import Callable
 from uuid import uuid4
 
+from pydantic import ValidationError
+
 from src.app.application.exchange.mexc_service import MexcService, PlaceOrderRequest, build_mexc_service
 from src.app.domain.entities.account import Account
 from src.app.domain.value_objects.order_type import OrderType
@@ -40,25 +42,47 @@ class AllocationUseCase:
     async def execute(self) -> AllocationResult:
         """Compare balances and submit a balancing order."""
         request_id = str(uuid4())
-        async with self._service_factory() as svc:
-            account = await svc.get_account()
-            qrl_free, usdt_free = _extract_balances(account)
-            side = Side("SELL") if qrl_free > usdt_free else Side("BUY")
-            order = await svc.place_order(
-                PlaceOrderRequest(
-                    symbol=Symbol("QRLUSDT"),
-                    side=side,
-                    order_type=OrderType("LIMIT"),
-                    quantity=Quantity(Decimal("1")),
-                    price=Price.from_single(Decimal("1")),
-                    time_in_force=TimeInForce("GTC"),
+        executed_at = datetime.now(timezone.utc)
+
+        try:
+            service = self._service_factory()
+        except ValidationError:
+            return AllocationResult(
+                request_id=request_id,
+                status="skipped_missing_credentials",
+                executed_at=executed_at,
+                action="SKIP",
+                order_id="N/A",
+            )
+
+        try:
+            async with service as svc:
+                account = await svc.get_account()
+                qrl_free, usdt_free = _extract_balances(account)
+                side = Side("SELL") if qrl_free > usdt_free else Side("BUY")
+                order = await svc.place_order(
+                    PlaceOrderRequest(
+                        symbol=Symbol("QRLUSDT"),
+                        side=side,
+                        order_type=OrderType("LIMIT"),
+                        quantity=Quantity(Decimal("1")),
+                        price=Price.from_single(Decimal("1")),
+                        time_in_force=TimeInForce("GTC"),
+                    )
                 )
+        except Exception:
+            return AllocationResult(
+                request_id=request_id,
+                status="error",
+                executed_at=executed_at,
+                action="FAILED",
+                order_id="N/A",
             )
 
         return AllocationResult(
             request_id=request_id,
             status="ok",
-            executed_at=datetime.now(timezone.utc),
+            executed_at=executed_at,
             action=side.value,
             order_id=order.order_id.value,
         )
