@@ -1,9 +1,10 @@
 """Pydantic schemas for interface layer requests/responses."""
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PlaceOrderRequest(BaseModel):
@@ -30,3 +31,13 @@ class GetOrderRequest(BaseModel):
 
 class ListTradesRequest(BaseModel):
     symbol: str = Field(default="QRLUSDT", description="Trading symbol")
+
+
+class AllocationResponse(BaseModel):
+    """Response returned when the allocation task is triggered."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    request_id: str = Field(description="Identifier for the allocation trigger")
+    status: str = Field(description="Execution status for the allocation task")
+    executed_at: datetime = Field(description="UTC timestamp when the task executed")
