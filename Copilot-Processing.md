@@ -1,1 +1,1 @@
-User request: Build an "allocation" endpoint for Cloud Scheduler to call in the qrl-url repository.
+1. User request: Investigate failing /tasks/allocation endpoint on Cloud Run (https://qrl-trading-api-545492969490.asia-southeast1.run.app/tasks/allocation) while it works locally at http://localhost:8080/tasks/allocation; fix so GET/POST succeed.
