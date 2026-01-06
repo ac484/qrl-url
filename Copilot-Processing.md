@@ -1,1 +1,1 @@
-User request: Analyze src/app/interfaces/http/pages/templates/dashboard/index.html for logic that can be moved to Python to improve clarity, project structure, performance, and single responsibility. Use Sequential-Thinking and Software-Planning-Tool methods. Implement minimal changes accordingly.
+User request: Build an "allocation" endpoint for Cloud Scheduler to call in the qrl-url repository.
