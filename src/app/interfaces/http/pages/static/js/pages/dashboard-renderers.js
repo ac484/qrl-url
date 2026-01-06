@@ -1,37 +1,38 @@
 (() => {
-  const $ = (id) => document.getElementById(id);
-  const setText = (id, v = "") => {
-    const el = $(id);
-    if (el) el.textContent = v;
-  };
+  const dom = window.coreDom || {};
+  const chartCore = window.coreChart || {};
+  const priceDomain = window.domainPrice || {};
+  const depthDomain = window.domainDepth || {};
+  const tradeDomain = window.domainTrade || {};
+  const orderDomain = window.domainOrder || {};
 
-  const chartEl = $("klineChart");
-  const chart =
-    window.Chart && chartEl
-      ? new Chart(chartEl.getContext("2d"), {
-          type: "line",
-          data: { labels: [], datasets: [{ data: [], borderColor: "#2196f3", fill: false, tension: 0.2 }] },
-        })
-      : { data: { labels: [], datasets: [{ data: [] }] }, update() {} };
+  const get = dom.get ?? (() => null);
+  const setText = dom.setText ?? (() => {});
+  const setHTML = dom.setHTML ?? (() => {});
+  const setError = dom.setError ?? (() => {});
 
-  const setPrice = (d) => {
-    setText("price-error", "");
-    setText("bid", d?.bid ?? "--");
-    setText("ask", d?.ask ?? "--");
-    setText("last", d?.last ?? "--");
-    const raw = d?.timestamp;
-    const parsed = typeof raw === "number" || typeof raw === "string" ? new Date(raw) : new Date();
+  const chart = chartCore.createLineChart
+    ? chartCore.createLineChart(get("klineChart")?.getContext("2d"))
+    : { data: { labels: [], datasets: [{ data: [] }] }, update() {} };
+
+  const setPrice = (payload) => {
+    const d = priceDomain.toView ? priceDomain.toView(payload) : payload || {};
+    setError("price-error", "");
+    setText("bid", d.bid ?? "--");
+    setText("ask", d.ask ?? "--");
+    setText("last", d.last ?? "--");
+    const parsed = typeof d.timestamp === "number" || typeof d.timestamp === "string" ? new Date(d.timestamp) : new Date();
     setText("timestamp", parsed.toISOString());
   };
 
   const setKlines = (items = []) => {
-    chart.data.labels = items.map((k) => new Date(k.timestamp).toLocaleTimeString());
-    chart.data.datasets[0].data = items.map((k) => Number(k.close));
-    chart.update();
+    const list = Array.isArray(items) ? items : [];
+    const points = list.map((k) => ({ label: new Date(k.timestamp).toLocaleTimeString(), value: Number(k.close) }));
+    if (chartCore.updateLine) chartCore.updateLine(chart, points);
   };
 
   const setBalances = (payload = {}) => {
-    setText("balance-error", "");
+    setError("balance-error", "");
     const balances = payload.balances || [];
     const byAsset = (asset) => balances.find((b) => b.asset === asset) || { free: "--", locked: "--" };
     const qrl = byAsset("QRL");
@@ -42,57 +43,48 @@
     setText("bal-usdt-locked", usdt.locked);
   };
 
-  const normalizeDepth = (item) => (Array.isArray(item) ? { price: item[0], qty: item[1] } : { price: item?.price ?? item?.p ?? "--", qty: item?.quantity ?? item?.q ?? "--" });
-
   const setDepth = (payload = {}) => {
-    setText("depth-error", "");
-    const bidsEl = $("depth-bids");
-    const asksEl = $("depth-asks");
+    setError("depth-error", "");
+    const bids = depthDomain.mapList ? depthDomain.mapList(payload.bids) : payload.bids || [];
+    const asks = depthDomain.mapList ? depthDomain.mapList(payload.asks) : payload.asks || [];
     const build = (items = []) =>
       items
         .slice(0, 10)
-        .map((entry) => {
-          const { price, qty } = normalizeDepth(entry);
-          return `<li><span class="price">${price}</span><span class="qty">${qty}</span></li>`;
-        })
+        .map((entry) => `<li><span class="price">${entry.price}</span><span class="qty">${entry.qty}</span></li>`)
         .join("");
-    if (bidsEl) bidsEl.innerHTML = build(payload.bids);
-    if (asksEl) asksEl.innerHTML = build(payload.asks);
-  };
-
-  const normalizeTrade = (t = {}) => {
-    const side = t.side ?? (t.isBuyerMaker === true ? "SELL" : t.isBuyerMaker === false ? "BUY" : "--");
-    const tsRaw = t.timestamp ?? t.time ?? Date.now();
-    return { price: t.price ?? t.p ?? "--", qty: t.quantity ?? t.q ?? "--", side, ts: typeof tsRaw === "string" ? tsRaw : new Date(tsRaw).toISOString() };
+    setHTML("depth-bids", build(bids));
+    setHTML("depth-asks", build(asks));
   };
 
   const setTrades = (payload = []) => {
-    setText("trades-error", "");
-    const el = $("trades-list");
-    if (!el) return;
-    el.innerHTML = payload
-      .slice(0, 20)
-      .map((t) => {
-        const n = normalizeTrade(t);
-        return `<li><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="ts">${n.ts}</span></li>`;
-      })
-      .join("");
+    setError("trades-error", "");
+    const list = tradeDomain.mapList ? tradeDomain.mapList(payload) : payload;
+    setHTML(
+      "trades-list",
+      list
+        .slice(0, 20)
+        .map(
+          (t) =>
+            `<li><span class="side ${t.side === "BUY" ? "buy" : "sell"}">${t.side}</span><span class="price">${t.price}</span><span class="qty">${t.qty}</span><span class="ts">${t.timestamp}</span></li>`,
+        )
+        .join(""),
+    );
   };
-
-  const normalizeOrder = (o = {}) => ({ side: o.side ?? "--", status: o.status ?? "--", price: o.price ?? o.limit_price ?? "--", qty: o.quantity ?? o.orig_qty ?? "--", id: o.order_id ?? o.orderId ?? "--" });
 
   const setOrders = (payload = []) => {
-    setText("orders-error", "");
-    const el = $("orders-list");
-    if (!el) return;
-    el.innerHTML = payload
-      .slice(0, 20)
-      .map((o) => {
-        const n = normalizeOrder(o);
-        return `<li><span class="id">${n.id}</span><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="status">${n.status}</span></li>`;
-      })
-      .join("");
+    setError("orders-error", "");
+    const list = orderDomain.mapList ? orderDomain.mapList(payload) : payload;
+    setHTML(
+      "orders-list",
+      list
+        .slice(0, 20)
+        .map(
+          (o) =>
+            `<li><span class="id">${o.id}</span><span class="side ${o.side === "BUY" ? "buy" : "sell"}">${o.side}</span><span class="price">${o.price}</span><span class="qty">${o.qty}</span><span class="status">${o.status}</span></li>`,
+        )
+        .join(""),
+    );
   };
 
-  window.dashboardUI = { setText, setPrice, setKlines, setBalances, setDepth, setTrades, setOrders };
+  window.dashboardUI = { setText, setError, setPrice, setKlines, setBalances, setDepth, setTrades, setOrders };
 })();

@@ -1,1 +1,1 @@
-User request: Analyze src/app/interfaces/http/pages/templates/dashboard/index.html for logic that can be moved to Python to improve clarity, project structure, performance, and single responsibility. Use Sequential-Thinking and Software-Planning-Tool methods. Implement minimal changes accordingly.
+User request: Evaluate current structure and potential code allocation in dashboard-related static files under src/app/interfaces/http/pages and subdirectories. Determine adjustments to meet requirements.
