@@ -105,6 +105,20 @@ src/app
 - Observability covers per-request logs/metrics; failure paths are surfaced without exposing secrets.  
 - Risks: MEXC API rate limits, Cloud Scheduler retries causing duplicate attempts, and Cloud Run cold starts increasing latency; mitigated via guards, caching, and replay window.
 
+## Required components & placement (DDD map)
+- **Value Objects** — `src/app/domain/value_objects/` (reuse `Price`, `Quantity`, `Symbol`, `QrlUsdtPair`; add `RebalanceBand`, `ExecutionUUID` if needed).  
+- **Entities** — `src/app/domain/entities/` (reuse `Order`, `Trade`, `Account`; extend only if strategy needs aggregate state).  
+- **Aggregates / Aggregate Root** — `Account` or `Portfolio` aggregate in `domain/entities/portfolio.py` (holds balances and open orders for QRL/USDT).  
+- **Domain Services** — `src/app/domain/strategies/rebalance.py` (pure sizing/guard logic, no I/O).  
+- **Factories** — lightweight builders for `PlannedOrder`/`RebalancePlan` inside `domain/strategies/rebalance.py`.  
+- **Repositories (interfaces only)** — `src/app/application/ports/` (e.g., `ExchangeGateway`, `AccountRepository`, `TickerRepository`) to abstract infra.  
+- **DTO / Strategy Config** — `RebalanceConfig`, `RebalancePlan`, `PlannedOrder`, `DecisionContext` in `domain/strategies/rebalance.py`; input/output DTOs only, no infra types.  
+- **Application Use Cases** — `src/app/application/trading/use_cases/rebalance_qrl.py` orchestrates snapshot → strategy → (optional) order placement.  
+- **Interfaces / Tasks** — `src/app/interfaces/tasks/{market_tasks.py,trading_tasks.py,entrypoints.py}` plus `interfaces/http/api/tasks_routes.py` for `POST /tasks/rebalance` (validation only).  
+- **Cross-cutting** — `src/app/infrastructure/event_bus/` (logging/metrics hooks), config loader (env), replay/dry-run flags; keep pure helpers under `src/app/shared/` if needed.  
+- **Infrastructure (MEXC)** — `src/app/infrastructure/exchange/mexc/` clients and mappers; consume via `MexcService` factory injected into the use case.  
+- **Docs (MEXC Spot v3, from Context7 `/suenot/mexc-docs-markdown`)** — required endpoints: `GET /api/v3/account`, `GET /api/v3/ticker/price`, `GET /api/v3/ticker/24hr`, `POST /api/v3/order`, `DELETE /api/v3/order`, `GET /api/v3/openOrders`, `GET /api/v3/myTrades`; WS: depth/trade streams for live pricing.
+
 ## Execution plan (actionable, ready to land)
 - **Create strategy primitives (Dev)**  
   - File: `src/app/domain/strategies/rebalance.py` with `RebalanceConfig`, `RebalancePlan`, `PlannedOrder`, `DecisionContext`, and what-if sizing helpers.  
