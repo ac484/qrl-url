@@ -200,7 +200,7 @@ canvas {
 }
 
 .orders-list li {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   padding: 4px 6px;
   font-size: 0.9rem;
 }
