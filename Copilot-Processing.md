@@ -1,1 +1,4 @@
-User request: Use Sequential-Thinking and Software-Planning-Tool methods to make cloud-scheduler-rebalance-plan.md more detailed while preserving overall structure. Ensure strategy & bot content stays separated from normal code and remains within strategy & bot areas.
+User Request Details:
+- Repository: ac484/qrl-url
+- Issue: "My Orders 缺少取消訂單按鈕與功能"
+- Requirements: Use contex7 to query MEXC v3 API for precise implementation, preserve project structure, follow single responsibility.
