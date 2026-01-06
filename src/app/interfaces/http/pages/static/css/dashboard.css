@@ -3,11 +3,30 @@ body {
   margin: 24px;
 }
 
-.grid {
+.dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 16px;
+  grid-template-columns: 320px 1fr 340px;
+  grid-template-areas:
+    "depth price orderform"
+    "depth kline orderform"
+    "depth trades orders"
+    "depth balances orders";
+  gap: 12px;
   align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-areas:
+      "price"
+      "kline"
+      "depth"
+      "orderform"
+      "trades"
+      "orders"
+      "balances";
+  }
 }
 
 .card {
@@ -97,8 +116,17 @@ canvas {
   gap: 8px;
 }
 
+.price-card {
+  grid-area: price;
+}
+
+.kline-card {
+  grid-area: kline;
+}
+
 .depth-card {
-  max-width: 420px;
+  grid-area: depth;
+  max-width: 360px;
 }
 
 .depth-card .depth-list {
@@ -109,21 +137,57 @@ canvas {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.trades-card {
+  grid-area: trades;
+}
+
 .trades-card .trades-list {
-  max-height: 180px;
+  max-height: 150px;
 }
 
 .trades-list li {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.orders-card {
+  grid-area: orders;
+}
+
 .orders-card .orders-list {
-  max-height: 200px;
+  max-height: 240px;
+}
+
+.balance-card {
+  grid-area: balances;
 }
 
 .order-card {
-  margin-top: 12px;
-  max-width: 420px;
+  grid-area: orderform;
+  max-width: 340px;
+}
+
+.depth-list li {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 4px 6px;
+  font-size: 0.9rem;
+}
+
+.trades-list li {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 4px 6px;
+  font-size: 0.9rem;
+}
+
+.orders-list li {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 4px 6px;
+  font-size: 0.9rem;
+}
+
+.depth-list,
+.trades-list,
+.orders-list {
+  max-height: 240px;
 }
 
 form .form-row {
