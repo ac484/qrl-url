@@ -33,6 +33,9 @@ class RebalanceRequest:
     profile: str = "default-qrl"
     dry_run: bool = True
     request_id: str | None = None
+    target_ratio_qrl: Decimal | None = None
+    tolerance: Decimal | None = None
+    min_notional_usdt: Decimal | None = None
 
 
 @dataclass
@@ -94,6 +97,7 @@ class RebalanceQrlUseCase:
         request_id = request.request_id or str(uuid.uuid4())
         settings = MexcSettings()
         service = self._service_factory(settings)
+        config = _resolve_config(self._config, request)
         logger.info(
             {
                 "msg": "rebalance.start",
@@ -111,7 +115,7 @@ class RebalanceQrlUseCase:
             usdt_free = _get_balance(account.balances, "USDT")
 
             ctx = DecisionContext(price=price, qrl_free=qrl_free, usdt_free=usdt_free)
-            plan = build_rebalance_plan(self._config, ctx)
+            plan = build_rebalance_plan(config, ctx)
 
             executed: list[dict] = []
 
@@ -162,3 +166,12 @@ def _get_balance(balances, asset: str) -> Decimal:
         if bal.asset.upper() == asset.upper():
             return bal.free
     return Decimal("0")
+
+
+def _resolve_config(base: RebalanceConfig, req: RebalanceRequest) -> RebalanceConfig:
+    return RebalanceConfig(
+        target_ratio_qrl=req.target_ratio_qrl if req.target_ratio_qrl is not None else base.target_ratio_qrl,
+        tolerance=req.tolerance if req.tolerance is not None else base.tolerance,
+        min_notional_usdt=req.min_notional_usdt if req.min_notional_usdt is not None else base.min_notional_usdt,
+        replay_ttl_seconds=base.replay_ttl_seconds,
+    )

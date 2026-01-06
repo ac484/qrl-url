@@ -10,6 +10,7 @@ from src.app.application.market.use_cases.get_market_trades import GetMarketTrad
 from src.app.application.trading.qrl.cancel_qrl_order import CancelQrlOrder
 from src.app.application.trading.qrl.get_qrl_order import GetQrlOrder
 from src.app.application.trading.qrl.place_qrl_order import PlaceQrlOrder
+from src.app.application.trading.use_cases.rebalance_qrl import RebalanceQrlUseCase, RebalanceRequest
 from src.app.application.account.use_cases.get_balance import GetBalanceUseCase
 from src.app.application.trading.use_cases.list_orders import ListOrdersUseCase
 from src.app.application.trading.use_cases.list_trades import ListTradesUseCase
@@ -125,3 +126,20 @@ async def qrl_summary(
         "trades": trades,
         "market_trades": market_trades[:trades_limit],
     }
+
+
+@router.post("/allocation")
+async def qrl_allocation(dry_run: bool = Query(default=True), tolerance: float = Query(default=0.01)):
+    """
+    Smart allocation endpoint to keep QRL:USDT at ~50/50 with 1% band by default.
+    """
+    use_case = RebalanceQrlUseCase()
+    response = await use_case.execute(
+        RebalanceRequest(
+            dry_run=dry_run,
+            target_ratio_qrl=Decimal("0.5"),
+            tolerance=Decimal(str(tolerance)),
+            min_notional_usdt=Decimal("10"),
+        )
+    )
+    return response.model_dump()
