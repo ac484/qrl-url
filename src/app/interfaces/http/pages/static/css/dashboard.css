@@ -30,6 +30,7 @@ body {
   grid-template-areas:
     "depth price orderform"
     "depth kline orderform"
+    "depth indicators orderform"
     "depth trades orders"
     "depth balances orders";
   gap: 12px;
@@ -42,6 +43,7 @@ body {
     grid-template-areas:
       "price"
       "kline"
+      "indicators"
       "depth"
       "orderform"
       "trades"
@@ -143,6 +145,10 @@ canvas {
 
 .kline-card {
   grid-area: kline;
+}
+
+.indicators-card {
+  grid-area: indicators;
 }
 
 .depth-card {

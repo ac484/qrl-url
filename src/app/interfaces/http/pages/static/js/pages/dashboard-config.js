@@ -11,7 +11,8 @@
 
   window.dashboardConfig = {
     priceUrl: data.price_url || "/api/qrl/price",
-    klineUrl: data.kline_url || "/api/qrl/kline?interval=1m&limit=50",
+    // Use daily klines with enough history to compute MA200/RSI/Williams %R
+    klineUrl: data.kline_url || "/api/qrl/kline?interval=1d&limit=260",
     orderUrl: data.order_url || "/api/qrl/orders",
     balanceUrl: data.balance_url || "/api/account/balance",
     depthUrl: data.depth_url || "/api/market/depth?limit=20",
