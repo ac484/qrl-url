@@ -1,1 +1,1 @@
-User request: Analyze src/app/interfaces/http/pages/templates/dashboard/index.html for logic that can be moved to Python to improve clarity, project structure, performance, and single responsibility. Use Sequential-Thinking and Software-Planning-Tool methods. Implement minimal changes accordingly.
+User request: Use Sequential-Thinking and Software-Planning-Tool methods to make cloud-scheduler-rebalance-plan.md more detailed while preserving overall structure. Ensure strategy & bot content stays separated from normal code and remains within strategy & bot areas.
