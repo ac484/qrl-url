@@ -7,19 +7,38 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
   <body>
-    <h1>QRL/USDT 即時價格與 K 線</h1>
-    <div class="grid">
-      <div class="card">
+    <div class="dashboard-grid">
+      <div class="card price-card">
         <div class="price-row"><span class="label">Bid</span><span id="bid" class="value">--</span></div>
         <div class="price-row"><span class="label">Ask</span><span id="ask" class="value">--</span></div>
         <div class="price-row"><span class="label">Last</span><span id="last" class="value">--</span></div>
         <div class="price-row"><span class="label">Updated</span><span id="timestamp" class="value">--</span></div>
         <div class="price-row error" id="price-error" aria-live="polite"></div>
       </div>
-      <div class="card">
+      <div class="card kline-card">
         <canvas id="klineChart" height="240"></canvas>
       </div>
-      <div class="card">
+      <div class="card depth-card">
+        <h2>Depth (QRL/USDT)</h2>
+        <div class="vertical-stack">
+          <div class="label">Asks</div>
+          <ul id="depth-asks" class="depth-list"></ul>
+          <div class="label">Bids</div>
+          <ul id="depth-bids" class="depth-list"></ul>
+        </div>
+        <div class="price-row error" id="depth-error" aria-live="polite"></div>
+      </div>
+      <div class="card trades-card">
+        <h2>Recent Trades</h2>
+        <ul id="trades-list" class="trades-list"></ul>
+        <div class="price-row error" id="trades-error" aria-live="polite"></div>
+      </div>
+      <div class="card orders-card">
+        <h2>My Orders</h2>
+        <ul id="orders-list" class="orders-list"></ul>
+        <div class="price-row error" id="orders-error" aria-live="polite"></div>
+      </div>
+      <div class="card balance-card">
         <h2>餘額</h2>
         <div class="price-row"><span class="label">QRL 可用</span><span id="bal-qrl-free" class="value">--</span></div>
         <div class="price-row"><span class="label">QRL 冻结</span><span id="bal-qrl-locked" class="value">--</span></div>
@@ -27,44 +46,44 @@
         <div class="price-row"><span class="label">USDT 冻结</span><span id="bal-usdt-locked" class="value">--</span></div>
         <div class="price-row error" id="balance-error" aria-live="polite"></div>
       </div>
-    </div>
-    <div class="card order-card">
-      <h2>下單</h2>
-      <form id="orderForm">
-        <div class="form-row">
-          <label>方向</label>
-          <div class="side-toggle" role="group" aria-label="Side">
-            <button type="button" data-side="BUY" class="side-btn active">買入</button>
-            <button type="button" data-side="SELL" class="side-btn">賣出</button>
+      <div class="card order-card">
+        <h2>下單</h2>
+        <form id="orderForm">
+          <div class="form-row">
+            <label>方向</label>
+            <div class="side-toggle" role="group" aria-label="Side">
+              <button type="button" data-side="BUY" class="side-btn active">買入</button>
+              <button type="button" data-side="SELL" class="side-btn">賣出</button>
+            </div>
+            <input type="hidden" name="side" value="BUY" />
           </div>
-          <input type="hidden" name="side" value="BUY" />
-        </div>
-        <div class="form-row">
-          <label>類型</label>
-          <select name="order_type">
-            <option value="LIMIT">LIMIT</option>
-            <option value="MARKET">MARKET</option>
-          </select>
-        </div>
-        <div class="form-row">
-          <label>數量</label>
-          <input name="quantity" type="number" step="0.0001" required />
-        </div>
-        <div class="form-row">
-          <label>價格</label>
-          <input name="price" type="number" step="0.0001" />
-        </div>
-        <div class="form-row">
-          <label>Time In Force</label>
-          <select name="time_in_force">
-            <option value="GTC">GTC</option>
-            <option value="IOC">IOC</option>
-            <option value="FOK">FOK</option>
-          </select>
-        </div>
-        <button type="submit">送出</button>
-        <div id="orderResult" class="order-result"></div>
-      </form>
+          <div class="form-row">
+            <label>類型</label>
+            <select name="order_type">
+              <option value="LIMIT">LIMIT</option>
+              <option value="MARKET">MARKET</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>數量</label>
+            <input name="quantity" type="number" step="0.0001" required />
+          </div>
+          <div class="form-row">
+            <label>價格</label>
+            <input name="price" type="number" step="0.0001" />
+          </div>
+          <div class="form-row">
+            <label>Time In Force</label>
+            <select name="time_in_force">
+              <option value="GTC">GTC</option>
+              <option value="IOC">IOC</option>
+              <option value="FOK">FOK</option>
+            </select>
+          </div>
+          <button type="submit">送出</button>
+          <div id="orderResult" class="order-result"></div>
+        </form>
+      </div>
     </div>
 
     <script>
@@ -72,36 +91,45 @@
       const klineUrl = "/api/qrl/kline?interval=1m&limit=50";
       const orderUrl = "/api/qrl/orders";
       const balanceUrl = "/api/account/balance";
+      const depthUrl = "/api/market/depth?limit=20";
+      const tradesUrl = "/api/market/trades?limit=50";
+      const ordersUrl = "/api/trading/orders";
       const ctx = document.getElementById("klineChart").getContext("2d");
 
-      let chart = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: [],
-          datasets: [
-            {
-              label: "Close",
-              data: [],
-              borderColor: "#2196f3",
-              fill: false,
-              tension: 0.2,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          scales: {
-            x: {
-              display: true,
-              ticks: { maxTicksLimit: 8 },
-            },
-            y: {
-              display: true,
-              beginAtZero: false,
-            },
-          },
-        },
-      });
+      let chart =
+        window.Chart && ctx
+          ? new Chart(ctx, {
+              type: "line",
+              data: {
+                labels: [],
+                datasets: [
+                  {
+                    label: "Close",
+                    data: [],
+                    borderColor: "#2196f3",
+                    fill: false,
+                    tension: 0.2,
+                  },
+                ],
+              },
+              options: {
+                responsive: true,
+                scales: {
+                  x: {
+                    display: true,
+                    ticks: { maxTicksLimit: 8 },
+                  },
+                  y: {
+                    display: true,
+                    beginAtZero: false,
+                  },
+                },
+              },
+            })
+          : {
+              data: { labels: [], datasets: [{ data: [] }] },
+              update: () => {},
+            };
 
       function setPrice(data) {
         document.getElementById("price-error").textContent = "";
@@ -137,12 +165,83 @@
         document.getElementById("bal-usdt-locked").textContent = usdt.locked;
       }
 
+      function setDepth(payload) {
+        const bidsEl = document.getElementById("depth-bids");
+        const asksEl = document.getElementById("depth-asks");
+        document.getElementById("depth-error").textContent = "";
+        const bids = payload?.bids || [];
+        const asks = payload?.asks || [];
+        const normalize = (item) => {
+          if (Array.isArray(item)) return { price: item[0], qty: item[1] };
+          return { price: item.price ?? item.p ?? "--", qty: item.quantity ?? item.q ?? "--" };
+        };
+        bidsEl.innerHTML = bids
+          .slice(0, 10)
+          .map((b) => {
+            const { price, qty } = normalize(b);
+            return `<li><span class="price">${price}</span><span class="qty">${qty}</span></li>`;
+          })
+          .join("");
+        asksEl.innerHTML = asks
+          .slice(0, 10)
+          .map((a) => {
+            const { price, qty } = normalize(a);
+            return `<li><span class="price">${price}</span><span class="qty">${qty}</span></li>`;
+          })
+          .join("");
+      }
+
+      function setTrades(payload) {
+        const el = document.getElementById("trades-list");
+        document.getElementById("trades-error").textContent = "";
+        const trades = payload || [];
+        const normalize = (t) => {
+          const price = t.price ?? t.p ?? "--";
+          const qty = t.quantity ?? t.q ?? "--";
+          const sideFlag = t.side ?? (t.isBuyerMaker === true ? "SELL" : t.isBuyerMaker === false ? "BUY" : "--");
+          const tsVal = t.timestamp ?? t.time ?? Date.now();
+          const ts = typeof tsVal === "string" ? tsVal : new Date(tsVal).toISOString();
+          return { price, qty, side: sideFlag, ts };
+        };
+        el.innerHTML = trades
+          .slice(0, 20)
+          .map((t) => {
+            const n = normalize(t);
+            return `<li><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="ts">${n.ts}</span></li>`;
+          })
+          .join("");
+      }
+
+      function setOrders(payload) {
+        const el = document.getElementById("orders-list");
+        document.getElementById("orders-error").textContent = "";
+        const orders = payload || [];
+        const normalize = (o) => {
+          const side = o.side ?? "--";
+          const status = o.status ?? "--";
+          const price = o.price ?? o.limit_price ?? "--";
+          const qty = o.quantity ?? o.orig_qty ?? "--";
+          const id = o.order_id ?? o.orderId ?? "--";
+          return { side, status, price, qty, id };
+        };
+        el.innerHTML = orders
+          .slice(0, 20)
+          .map((o) => {
+            const n = normalize(o);
+            return `<li><span class="id">${n.id}</span><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="status">${n.status}</span></li>`;
+          })
+          .join("");
+      }
+
       async function refresh() {
         try {
-          const [priceResp, klineResp, balanceResp] = await Promise.all([
+          const [priceResp, klineResp, balanceResp, depthResp, tradesResp, ordersResp] = await Promise.all([
             fetch(priceUrl),
             fetch(klineUrl),
             fetch(balanceUrl),
+            fetch(depthUrl),
+            fetch(tradesUrl),
+            fetch(ordersUrl),
           ]);
           if (priceResp.ok) {
             setPrice(await priceResp.json());
@@ -157,21 +256,33 @@
             const data = await balanceResp.json().catch(() => ({}));
             document.getElementById("balance-error").textContent = data.detail || "餘額取得失敗";
           }
+          if (depthResp.ok) {
+            setDepth(await depthResp.json());
+          } else {
+            const data = await depthResp.json().catch(() => ({}));
+            document.getElementById("depth-error").textContent = data.detail || "Depth 取得失敗";
+          }
+          if (tradesResp.ok) {
+            setTrades(await tradesResp.json());
+          } else {
+            const data = await tradesResp.json().catch(() => ({}));
+            document.getElementById("trades-error").textContent = data.detail || "Trades 取得失敗";
+          }
+          if (ordersResp.ok) {
+            setOrders(await ordersResp.json());
+          } else {
+            const data = await ordersResp.json().catch(() => ({}));
+            document.getElementById("orders-error").textContent = data.detail || "Orders 取得失敗";
+          }
         } catch (err) {
           console.error(err);
           document.getElementById("price-error").textContent = "連線錯誤";
           document.getElementById("balance-error").textContent = "連線錯誤";
+          document.getElementById("depth-error").textContent = "連線錯誤";
+          document.getElementById("trades-error").textContent = "連線錯誤";
+          document.getElementById("orders-error").textContent = "連線錯誤";
         }
       }
-
-      // Seed with sample data so the page renders even without backend
-      setPrice({ bid: "0.1000", ask: "0.1010", last: "0.1005", timestamp: new Date().toISOString() });
-      setKlines(
-        Array.from({ length: 20 }, (_, i) => ({
-          close: (0.095 + i * 0.0005).toFixed(4),
-          timestamp: new Date(Date.now() - (20 - i) * 60000).toISOString(),
-        }))
-      );
 
       refresh();
       setInterval(refresh, 10000);
