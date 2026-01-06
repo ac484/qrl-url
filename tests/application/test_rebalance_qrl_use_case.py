@@ -1,9 +1,21 @@
 import asyncio
+import sys
 import unittest
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock
+
+try:
+    import httpx  # noqa: F401
+except ImportError:
+    raise unittest.SkipTest("httpx not installed")
+
+ROOT = Path(__file__).resolve().parents[2]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.append(str(SRC))
 
 from src.app.application.trading.use_cases.rebalance_qrl import (
     RebalanceQrlUseCase,
@@ -58,7 +70,7 @@ def _fake_order():
     )
 
 
-class RebalanceUseCaseTests(IsolatedAsyncioTestCase):
+class TestRebalanceUseCase(IsolatedAsyncioTestCase):
     async def test_dry_run_returns_plan(self):
         price = Price.from_single(Decimal("1"))
         account = Account(

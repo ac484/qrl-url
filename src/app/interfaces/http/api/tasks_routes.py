@@ -36,15 +36,20 @@ async def _authorize_scheduler(
         )
 
 
+def _rebalance_handler():
+    return trigger_rebalance
+
+
 @router.post("/rebalance")
 async def post_rebalance(
     body: RebalanceBody,
     _auth: Any = Depends(_authorize_scheduler),
+    handler=Depends(_rebalance_handler),
 ):
     """
     Cloud Scheduler / Cloud Tasks entrypoint for QRL/USDT rebalance.
 
     Validates basic scheduler headers then forwards payload to the task façade.
     """
-    result = await trigger_rebalance(body.model_dump())
+    result = await handler(body.model_dump())
     return result

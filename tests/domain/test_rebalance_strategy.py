@@ -1,6 +1,13 @@
+import sys
 import unittest
 from decimal import Decimal
 from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.append(str(SRC))
 
 from src.app.domain.strategies.rebalance import (
     DecisionContext,
@@ -10,7 +17,7 @@ from src.app.domain.strategies.rebalance import (
 from src.app.domain.value_objects.price import Price
 
 
-class RebalanceStrategyTests(unittest.TestCase):
+class TestRebalanceStrategy(unittest.TestCase):
     def test_within_tolerance_no_orders(self) -> None:
         price = Price(bid=Decimal("1"), ask=Decimal("1"), last=Decimal("1"), timestamp=self._ts())
         ctx = DecisionContext(price=price, qrl_free=Decimal("50"), usdt_free=Decimal("50"))
