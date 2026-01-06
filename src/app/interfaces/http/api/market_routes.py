@@ -2,6 +2,7 @@ from fastapi import APIRouter, Query
 
 from src.app.application.market.use_cases.get_depth import GetDepthUseCase
 from src.app.application.market.use_cases.get_kline import GetKlineUseCase
+from src.app.application.market.use_cases.get_market_trades import GetMarketTradesInput, GetMarketTradesUseCase
 from src.app.application.market.use_cases.get_stats24h import GetStats24hUseCase
 from src.app.application.market.use_cases.get_ticker import GetTickerUseCase
 
@@ -38,3 +39,10 @@ async def get_stats_24h():
     """Get 24h statistics for QRL/USDT."""
     usecase = GetStats24hUseCase()
     return await usecase.execute()
+
+
+@router.get("/trades")
+async def get_market_trades(limit: int = Query(default=50, ge=1, le=500)):
+    """Get recent public trades for QRL/USDT."""
+    usecase = GetMarketTradesUseCase()
+    return await usecase.execute(data=GetMarketTradesInput(limit=limit))

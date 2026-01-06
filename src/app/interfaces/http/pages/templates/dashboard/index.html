@@ -27,6 +27,25 @@
         <div class="price-row"><span class="label">USDT 冻结</span><span id="bal-usdt-locked" class="value">--</span></div>
         <div class="price-row error" id="balance-error" aria-live="polite"></div>
       </div>
+      <div class="card">
+        <h2>Depth (QRL/USDT)</h2>
+        <div class="flex-row">
+          <div class="depth-col">
+            <div class="label">Bids</div>
+            <ul id="depth-bids" class="depth-list"></ul>
+          </div>
+          <div class="depth-col">
+            <div class="label">Asks</div>
+            <ul id="depth-asks" class="depth-list"></ul>
+          </div>
+        </div>
+        <div class="price-row error" id="depth-error" aria-live="polite"></div>
+      </div>
+      <div class="card">
+        <h2>Recent Trades</h2>
+        <ul id="trades-list" class="trades-list"></ul>
+        <div class="price-row error" id="trades-error" aria-live="polite"></div>
+      </div>
     </div>
     <div class="card order-card">
       <h2>下單</h2>
@@ -72,6 +91,8 @@
       const klineUrl = "/api/qrl/kline?interval=1m&limit=50";
       const orderUrl = "/api/qrl/orders";
       const balanceUrl = "/api/account/balance";
+      const depthUrl = "/api/market/depth?limit=20";
+      const tradesUrl = "/api/market/trades?limit=50";
       const ctx = document.getElementById("klineChart").getContext("2d");
 
       let chart = new Chart(ctx, {
@@ -137,12 +158,61 @@
         document.getElementById("bal-usdt-locked").textContent = usdt.locked;
       }
 
+      function setDepth(payload) {
+        const bidsEl = document.getElementById("depth-bids");
+        const asksEl = document.getElementById("depth-asks");
+        document.getElementById("depth-error").textContent = "";
+        const bids = payload?.bids || [];
+        const asks = payload?.asks || [];
+        const normalize = (item) => {
+          if (Array.isArray(item)) return { price: item[0], qty: item[1] };
+          return { price: item.price ?? item.p ?? "--", qty: item.quantity ?? item.q ?? "--" };
+        };
+        bidsEl.innerHTML = bids
+          .slice(0, 10)
+          .map((b) => {
+            const { price, qty } = normalize(b);
+            return `<li><span class="price">${price}</span><span class="qty">${qty}</span></li>`;
+          })
+          .join("");
+        asksEl.innerHTML = asks
+          .slice(0, 10)
+          .map((a) => {
+            const { price, qty } = normalize(a);
+            return `<li><span class="price">${price}</span><span class="qty">${qty}</span></li>`;
+          })
+          .join("");
+      }
+
+      function setTrades(payload) {
+        const el = document.getElementById("trades-list");
+        document.getElementById("trades-error").textContent = "";
+        const trades = payload || [];
+        const normalize = (t) => {
+          const price = t.price ?? t.p ?? "--";
+          const qty = t.quantity ?? t.q ?? "--";
+          const sideFlag = t.side ?? (t.isBuyerMaker === true ? "SELL" : t.isBuyerMaker === false ? "BUY" : "--");
+          const tsVal = t.timestamp ?? t.time ?? Date.now();
+          const ts = typeof tsVal === "string" ? tsVal : new Date(tsVal).toISOString();
+          return { price, qty, side: sideFlag, ts };
+        };
+        el.innerHTML = trades
+          .slice(0, 20)
+          .map((t) => {
+            const n = normalize(t);
+            return `<li><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="ts">${n.ts}</span></li>`;
+          })
+          .join("");
+      }
+
       async function refresh() {
         try {
-          const [priceResp, klineResp, balanceResp] = await Promise.all([
+          const [priceResp, klineResp, balanceResp, depthResp, tradesResp] = await Promise.all([
             fetch(priceUrl),
             fetch(klineUrl),
             fetch(balanceUrl),
+            fetch(depthUrl),
+            fetch(tradesUrl),
           ]);
           if (priceResp.ok) {
             setPrice(await priceResp.json());
@@ -157,10 +227,24 @@
             const data = await balanceResp.json().catch(() => ({}));
             document.getElementById("balance-error").textContent = data.detail || "餘額取得失敗";
           }
+          if (depthResp.ok) {
+            setDepth(await depthResp.json());
+          } else {
+            const data = await depthResp.json().catch(() => ({}));
+            document.getElementById("depth-error").textContent = data.detail || "Depth 取得失敗";
+          }
+          if (tradesResp.ok) {
+            setTrades(await tradesResp.json());
+          } else {
+            const data = await tradesResp.json().catch(() => ({}));
+            document.getElementById("trades-error").textContent = data.detail || "Trades 取得失敗";
+          }
         } catch (err) {
           console.error(err);
           document.getElementById("price-error").textContent = "連線錯誤";
           document.getElementById("balance-error").textContent = "連線錯誤";
+          document.getElementById("depth-error").textContent = "連線錯誤";
+          document.getElementById("trades-error").textContent = "連線錯誤";
         }
       }
 
@@ -172,6 +256,8 @@
           timestamp: new Date(Date.now() - (20 - i) * 60000).toISOString(),
         }))
       );
+      setDepth({ bids: [], asks: [] });
+      setTrades([]);
 
       refresh();
       setInterval(refresh, 10000);
