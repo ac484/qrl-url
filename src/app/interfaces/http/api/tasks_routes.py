@@ -6,7 +6,7 @@ from src.app.interfaces.tasks import entrypoints
 router = APIRouter()
 
 
-@router.post("/allocation", response_model=AllocationResponse, tags=["tasks"])
+@router.api_route("/allocation", methods=["POST", "GET"], response_model=AllocationResponse, tags=["tasks"])
 async def trigger_allocation() -> AllocationResponse:
     """Endpoint for Cloud Scheduler to trigger an allocation run."""
     result = await entrypoints.run_allocation()
