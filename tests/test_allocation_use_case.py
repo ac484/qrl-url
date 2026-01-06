@@ -1,13 +1,6 @@
 from datetime import datetime, timezone
 from decimal import Decimal
-from pathlib import Path
-import sys
-
 import pytest
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 from src.app.application.exchange.mexc_service import PlaceOrderRequest
 from src.app.application.system.use_cases.allocation import AllocationUseCase

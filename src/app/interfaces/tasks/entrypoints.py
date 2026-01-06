@@ -11,7 +11,7 @@ def _allocation_timeout_seconds() -> float:
     raw: str | None = os.getenv("TASK_TIMEOUT_SECONDS", "20")
     try:
         return float(raw)
-    except (TypeError, ValueError):
+    except ValueError:
         return 20.0
 
 
