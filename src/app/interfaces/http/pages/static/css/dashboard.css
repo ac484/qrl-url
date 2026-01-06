@@ -200,9 +200,30 @@ canvas {
 }
 
 .orders-list li {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  /* Columns: ID | Side | Price | Quantity | Amount | Status | Action */
+  grid-template-columns: 1.6fr 0.8fr 1fr 1fr 1fr 1fr 0.9fr;
   padding: 4px 6px;
   font-size: 0.9rem;
+}
+
+.orders-list .orders-header {
+  position: sticky;
+  top: 0;
+  background: #fafafa;
+  font-weight: 700;
+  z-index: 1;
+}
+
+.orders-list .status-label {
+  color: #555;
+}
+
+.orders-list .order-cancel {
+  padding: 6px 10px;
+  background: #2196f3;
+  color: #fff;
+  border: 1px solid #2196f3;
+  border-radius: 4px;
 }
 
 .depth-list,
