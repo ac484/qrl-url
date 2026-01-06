@@ -26,8 +26,13 @@
   };
 
   const setKlines = (items = []) => {
-    const list = Array.isArray(items) ? items : [];
-    const points = list.map((k) => ({ label: new Date(k.timestamp).toLocaleTimeString(), value: Number(k.close) }));
+    const rawList = Array.isArray(items) ? items : Array.isArray(items?.klines) ? items.klines : [];
+    const points = rawList
+      .filter((k) => k && k.timestamp !== undefined)
+      .map((k) => {
+        const ts = typeof k.timestamp === "string" || typeof k.timestamp === "number" ? new Date(k.timestamp) : new Date();
+        return { label: ts.toLocaleTimeString(), value: Number(k.close) };
+      });
     if (chartCore.updateLine) chartCore.updateLine(chart, points);
   };
 
