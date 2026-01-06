@@ -36,6 +36,7 @@ class RebalanceRequest:
     target_ratio_qrl: Decimal | None = None
     tolerance: Decimal | None = None
     min_notional_usdt: Decimal | None = None
+    max_notional_usdt: Decimal | None = None
 
 
 @dataclass
@@ -173,5 +174,6 @@ def _resolve_config(base: RebalanceConfig, req: RebalanceRequest) -> RebalanceCo
         target_ratio_qrl=req.target_ratio_qrl if req.target_ratio_qrl is not None else base.target_ratio_qrl,
         tolerance=req.tolerance if req.tolerance is not None else base.tolerance,
         min_notional_usdt=req.min_notional_usdt if req.min_notional_usdt is not None else base.min_notional_usdt,
+        max_notional_usdt=req.max_notional_usdt if req.max_notional_usdt is not None else base.max_notional_usdt,
         replay_ttl_seconds=base.replay_ttl_seconds,
     )

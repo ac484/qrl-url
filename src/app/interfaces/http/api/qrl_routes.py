@@ -139,7 +139,8 @@ async def qrl_allocation(dry_run: bool = Query(default=True), tolerance: float =
             dry_run=dry_run,
             target_ratio_qrl=Decimal("0.5"),
             tolerance=Decimal(str(tolerance)),
-            min_notional_usdt=Decimal("10"),
+            min_notional_usdt=Decimal("0.5"),
+            max_notional_usdt=Decimal("2"),
         )
     )
     return response.model_dump()

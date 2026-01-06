@@ -18,7 +18,8 @@ class RebalanceConfig:
 
     target_ratio_qrl: Decimal = Decimal("0.5")  # portion of portfolio value in QRL
     tolerance: Decimal = Decimal("0.02")  # acceptable drift before trading
-    min_notional_usdt: Decimal = Decimal("10")  # skip if trade value below this
+    min_notional_usdt: Decimal = Decimal("1")  # skip if trade value below this
+    max_notional_usdt: Decimal = Decimal("2")  # cap per order to protect size
     replay_ttl_seconds: int = 300
 
 
@@ -100,7 +101,8 @@ def build_rebalance_plan(config: RebalanceConfig, context: DecisionContext) -> R
     )
     delta_value = (desired_qrl_value - context.qrl_value).quantize(Decimal("0.00000001"))
 
-    if delta_value.copy_abs() < config.min_notional_usdt:
+    abs_delta = delta_value.copy_abs()
+    if abs_delta < config.min_notional_usdt:
         return RebalancePlan(
             target_ratio_qrl=config.target_ratio_qrl,
             current_ratio_qrl=current_ratio,
@@ -108,7 +110,8 @@ def build_rebalance_plan(config: RebalanceConfig, context: DecisionContext) -> R
             orders=[],
         )
 
-    qty_decimal = (delta_value.copy_abs() / context.price.last).quantize(
+    capped_notional = min(abs_delta, config.max_notional_usdt)
+    qty_decimal = (capped_notional / context.price.last).quantize(
         QrlQuantity.STEP_SIZE, rounding=ROUND_DOWN
     )
 
@@ -116,6 +119,13 @@ def build_rebalance_plan(config: RebalanceConfig, context: DecisionContext) -> R
     try:
         qrl_qty = QrlQuantity(qty_decimal)
     except ValueError:
+        return RebalancePlan(
+            target_ratio_qrl=config.target_ratio_qrl,
+            current_ratio_qrl=current_ratio,
+            delta_value_usdt=delta_value,
+            orders=[],
+        )
+    if qrl_qty.value <= 0:
         return RebalancePlan(
             target_ratio_qrl=config.target_ratio_qrl,
             current_ratio_qrl=current_ratio,
