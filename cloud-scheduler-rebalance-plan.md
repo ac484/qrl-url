@@ -20,6 +20,12 @@ post_date: 2026-01-06
 ## Purpose
 Identify the missing pieces to let Cloud Scheduler call this Cloud Run service to execute a QRL/USDT rebalancing strategy, confirm MEXC Spot API v3 coverage via Context7, and propose a concrete implementation path that preserves single-responsibility/DDD boundaries.
 
+## Guardrails (strategy & bot separation)
+- Strategy math and bot decisions live only under `domain/strategies/` and `application/trading/use_cases/`; interfaces/routes must not embed thresholds, sizing, or guard logic.
+- Interfaces/task entrypoints (`interfaces/tasks` and `interfaces/http/api/tasks_routes.py`) only validate input, pass VOs/DTOs to use cases, and render responses.
+- Infrastructure clients (`infrastructure/exchange/mexc`) stay thin mappers/adapters; no strategy state in HTTP pages, templates, or static assets.
+- Keep any staging/dry-run toggles in config or DTOs, not in controllers, to avoid mixing bot logic with presentation code.
+
 ## Current structure (focused tree)
 ```
 src/app
@@ -57,16 +63,44 @@ src/app
 - Observability and tests: no fast tests for guards/sizing, no task-level logging/metrics to trace scheduler executions, and no dry-run mode to avoid unintended live trades.
 
 ## Implementation steps (ordered, keep DDD boundaries)
-1) **Define strategy domain + DTOs**: add a `domain/strategies/rebalance.py` (target weights, thresholds, cool-down) plus DTOs for computed orders; ensure VOs (Price, Quantity, QrlUsdtPair) are reused.
-2) **Application use case**: create `application/trading/use_cases/rebalance_qrl.py` that accepts strategy config + market snapshot, runs guards (rate limit, duplicate, balance), and returns structured plan/results (no raw dicts).
-3) **Infrastructure wiring**: reuse `MexcRestClient`/`QrlRestClient` inside a `MexcService` factory, add lightweight caching for ticker/account, and ensure async context is owned by the use case (per repo rules).
-4) **Scheduler HTTP entrypoint**: add `interfaces/http/api/tasks_routes.py` (or extend `entrypoints.py`) with `POST /tasks/rebalance` protected by Cloud Scheduler OIDC audience, parsing a small payload (strategy profile ID or default); this route should call the use case and return a normalized report.
-5) **Task façade**: implement `interfaces/tasks/market_tasks.py` (load price/depth), `trading_tasks.py` (invoke rebalance), and use `entrypoints.py` to share logic between HTTP route and any future Cloud Tasks/Jobs triggers.
-6) **Deployment & IAM**: update `cloudbuild.yaml` notes/scripts to create a Cloud Scheduler job pointing to the Cloud Run URL with a service account; document required env vars (`PORT`, `MEXC_*`, scheduler audience) and recommend `X-CloudScheduler` replay checks.
-7) **Testing & observability**: add unit tests for sizing/guards, and include structured logging around every scheduler invocation (start/end, symbol, orders placed, errors) plus optional dry-run flag.
+1) **Strategy domain + DTOs (strategy folder only)**  
+   - Add `domain/strategies/rebalance.py` to hold target weights, bands, cool-down, dry-run, and replay window.  
+   - Create DTOs for inputs/outputs (`RebalanceConfig`, `RebalancePlan`, `PlannedOrder`) that wrap existing VOs (Price, Quantity, QrlUsdtPair) and never leak raw dicts.  
+   - Keep simulation helpers (what-if sizing) here to stay separated from interfaces.
+2) **Application use case orchestration**  
+   - Add `application/trading/use_cases/rebalance_qrl.py` that owns async context for `MexcService`/gateways, fetches snapshot (balances + ticker), runs guards (rate limit, duplicate exec UUID, balance sanity), computes deltas via domain strategy, and returns a structured report.  
+   - Accept an explicit `StrategyProfile` identifier and `dry_run: bool`; no controller math.  
+   - Ensure no infrastructure creation in controllers; inject services via constructor/Depends.
+3) **Infrastructure wiring and caching**  
+   - Reuse `MexcRestClient`/`QrlRestClient` through a `MexcService` factory and a lightweight cache (ticker/account TTL ≤ 5s) owned by the use case.  
+   - Map REST payloads to VOs/entities at the boundary; log correlation IDs for each call.  
+   - Keep adapters in `infrastructure/exchange/mexc`; do not place strategy state there.
+4) **Scheduler HTTP entrypoint (interfaces/tasks only)**  
+   - Implement `interfaces/http/api/tasks_routes.py` (or `entrypoints.py`) exposing `POST /tasks/rebalance` that only validates payload and OIDC audience, then calls the use case.  
+   - Expected payload (JSON): `{ "profile": "default-qrl", "dry_run": true, "request_id": "<uuid>" }`.  
+   - Response DTO: `{ "request_id": "<uuid>", "plan": [...orders], "executed": [...], "dry_run": true, "started_at": "...", "ended_at": "...", "errors": [] }`.
+5) **Task façades (shared between HTTP/Scheduler/Batches)**  
+   - `interfaces/tasks/market_tasks.py`: fetch price/depth snapshot as a pure function returning VOs/DTOs.  
+   - `interfaces/tasks/trading_tasks.py`: call the rebalance use case and return structured results; no business logic.  
+   - `interfaces/tasks/entrypoints.py`: thin adapter to wire HTTP route to task façades and future Cloud Tasks/Jobs triggers.
+6) **Deployment & IAM (keep out of app code)**  
+   - Cloud Scheduler job: HTTPS POST to Cloud Run URL with OIDC token audience set to the service; store service account email in IaC or cloudbuild variables.  
+   - Validate `Authorization` OIDC token and `X-CloudScheduler` headers; reject mismatched audience or missing replay window.  
+   - Config knobs (env): `SCHEDULER_AUDIENCE`, `SCHEDULER_REPLAY_TTL_SEC`, `REBALANCE_PROFILE`, `REBALANCE_DRY_RUN_DEFAULT`, `MEXC_*`, `PORT`. Keep these documented in `.env.example` not in controllers.
+7) **Testing & observability (fast, strategy-focused)**  
+   - Unit tests in strategy layer for sizing, thresholds, and guard rails; include fixtures for ticker/account snapshots.  
+   - Add task-level structured logging (JSON) with fields: `request_id`, `profile`, `dry_run`, `orders_planned`, `orders_sent`, `latency_ms`, `status`.  
+   - Provide a dry-run mode that skips order placement but returns the computed plan; expose a staging profile to validate in CI.
 
 ## Scheduler ↔ Cloud Run wiring notes
 - Use HTTPS POST from Cloud Scheduler with OIDC token targeting the Cloud Run service audience; reject unauthenticated or replayed requests.
 - Keep handler idempotent: include execution UUID in responses and ignore duplicates within a window; rely on strategy thresholds to avoid churning orders.
 - Support dry-run execution to emit the planned orders without placing them, enabling staging validation before production.
 - Log and export metrics (success/failure, latency, orders placed) to aid SRE and finance review.
+
+## Acceptance & risks checklist (strategy/bot scope)
+- Strategy logic is confined to `domain/strategies` and `application/trading/use_cases`; interfaces/tasks remain orchestration-only.  
+- Scheduler contract is documented (payload, headers, audience) and validated in controllers without embedding strategy math.  
+- Dry-run and replay protection are implemented and testable without touching presentation code.  
+- Observability covers per-request logs/metrics; failure paths are surfaced without exposing secrets.  
+- Risks: MEXC API rate limits, Cloud Scheduler retries causing duplicate attempts, and Cloud Run cold starts increasing latency; mitigated via guards, caching, and replay window.
