@@ -1,5 +1,5 @@
 """
-Market use case: get ticker for QRL/USDT.
+Market use case: recent public trades for QRL/USDT.
 """
 
 from dataclasses import dataclass
@@ -9,17 +9,18 @@ from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
 
 
 @dataclass
-class GetTickerInput:
-    include_timestamp: bool = True
+class GetMarketTradesInput:
+    limit: int = 50
 
 
-class GetTickerUseCase:
-    """Fetch 24h ticker for the fixed QRL/USDT symbol."""
+class GetMarketTradesUseCase:
+    """Fetch recent public trades for the fixed QRL/USDT symbol."""
 
     def __init__(self, settings: QrlSettings | None = None):
         self._settings = settings or QrlSettings()
 
-    async def execute(self, data: GetTickerInput | None = None) -> dict:
+    async def execute(self, data: GetMarketTradesInput | None = None) -> list:
+        payload = data or GetMarketTradesInput()
         client = QrlRestClient(self._settings)
         async with client as cli:
-            return await cli.ticker_24h()
+            return await cli.market_trades(limit=payload.limit)

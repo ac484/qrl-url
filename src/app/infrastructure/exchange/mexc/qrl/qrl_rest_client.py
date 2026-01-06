@@ -28,6 +28,9 @@ class QrlRestClient:
             "GET", "/api/v3/depth", params={"symbol": QrlUsdtPair.symbol(), "limit": limit}
         )
 
+    async def market_trades(self, *, limit: int = 50) -> list:
+        return await self._client.trades(symbol=QrlUsdtPair.symbol(), limit=limit)
+
     async def create_order(
         self,
         *,
