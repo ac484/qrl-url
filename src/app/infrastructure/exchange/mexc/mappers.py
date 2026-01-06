@@ -24,7 +24,13 @@ def _to_decimal(value: Any) -> Decimal:
 
 
 def _to_timestamp_from_ms(value: int | float | str) -> Timestamp:
-    ms_value = int(value)
+    if value in (None, "", 0):
+        ms_value = 0
+    else:
+        try:
+            ms_value = int(value)
+        except (TypeError, ValueError):
+            ms_value = 0
     dt = datetime.fromtimestamp(ms_value / 1000, tz=timezone.utc)
     return Timestamp(dt)
 
