@@ -79,27 +79,52 @@
       .join("");
   };
 
-  const normalizeOrder = (o = {}) => ({
-    side: o.side ?? "--",
-    status: o.status ?? "--",
-    price: o.price ?? o.limit_price ?? "--",
-    qty: o.quantity ?? o.orig_qty ?? "--",
-    id: o.order_id ?? o.orderId ?? "--",
-  });
+  const formatAmount = (price, qty, quote) => {
+    if (quote !== undefined && quote !== null) return quote;
+    const p = Number(price);
+    const q = Number(qty);
+    return Number.isFinite(p) && Number.isFinite(q) ? (p * q).toFixed(4) : "--";
+  };
+
+  const normalizeOrder = (o = {}) => {
+    const status = (o.status ?? "--").toString().toUpperCase();
+    const price = o.price ?? o.limit_price ?? o.avg_price ?? "--";
+    const qty = o.quantity ?? o.orig_qty ?? "--";
+    const quote =
+      o.cumulative_quote_quantity ??
+      o.cum_quote_quantity ??
+      o.cumulative_quote_qty ??
+      o.cummulativeQuoteQty ??
+      undefined;
+    return {
+      side: o.side ?? "--",
+      status,
+      price,
+      qty,
+      amount: formatAmount(price, qty, quote),
+      id: o.order_id ?? o.orderId ?? "--",
+      canCancel: !["CANCELED", "FILLED", "REJECTED", "EXPIRED"].includes(status),
+    };
+  };
 
   const setOrders = (payload = []) => {
     setText("orders-error", "");
     const el = $("orders-list");
     if (!el) return;
-    el.innerHTML = payload
-      .slice(0, 20)
-      .map((o) => {
-        const n = normalizeOrder(o);
-        const canCancel = n.status === "NEW" || n.status === "PARTIALLY_FILLED";
-        const btn = canCancel ? `<button type="button" class="cancel-btn" data-id="${n.id}">取消</button>` : "";
-        return `<li><span class="id">${n.id}</span><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="status">${n.status}</span>${btn}</li>`;
-      })
-      .join("");
+    const header =
+      '<li class="orders-header"><span class="id">訂單ID</span><span class="side">方向</span><span class="price">價格</span><span class="qty">數量</span><span class="amount">金額</span><span class="status">狀態</span><span class="action">操作</span></li>';
+    el.innerHTML =
+      header +
+      payload
+        .slice(0, 20)
+        .map((o) => {
+          const n = normalizeOrder(o);
+          const action = n.canCancel
+            ? `<button class="order-cancel" data-order-id="${n.id}" aria-label="取消訂單 ${n.id}">取消</button>`
+            : `<span class="status-label">${n.status}</span>`;
+          return `<li data-order-id="${n.id}"><span class="id">${n.id}</span><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="amount">${n.amount}</span><span class="status">${n.status}</span><span class="action">${action}</span></li>`;
+        })
+        .join("");
   };
 
   window.dashboardUI = { setText, setPrice, setKlines, setBalances, setDepth, setTrades, setOrders };

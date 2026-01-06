@@ -15,35 +15,6 @@
   };
 
   const err = (id, detail, fallback) => ui.setText(id, detail || fallback);
-  const orderApi = window.orderDomain || {};
-  const ordersList = document.getElementById("orders-list");
-  const ordersError = document.getElementById("orders-error");
-
-  const setOrdersMessage = (msg) => {
-    if (ordersError) ordersError.textContent = msg || "";
-  };
-
-  const wireOrderCancel = () => {
-    if (!ordersList || !orderApi.cancelOrder) return;
-    ordersList.addEventListener("click", async (evt) => {
-      const btn = evt.target.closest(".cancel-btn");
-      if (!btn) return;
-      const orderId = btn.dataset.id;
-      if (!orderId) return;
-      btn.disabled = true;
-      btn.textContent = "取消中...";
-      setOrdersMessage("");
-      try {
-        await orderApi.cancelOrder(cfg, orderId);
-        btn.textContent = "已送出";
-        await refresh();
-      } catch (ex) {
-        btn.disabled = false;
-        btn.textContent = "取消";
-        setOrdersMessage(ex.message || "取消失敗");
-      }
-    });
-  };
 
   async function refresh() {
     try {
@@ -109,10 +80,44 @@
     });
   };
 
+  const cancelOrder = async (orderId, button) => {
+    if (!orderId || !cfg.ordersUrl) return;
+    const url = `${cfg.ordersUrl}/${encodeURIComponent(orderId)}/cancel`;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = "取消中...";
+    try {
+      const resp = await fetch(url, { method: "POST" });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        err("orders-error", data.detail, "取消失敗");
+      } else {
+        ui.setText("orders-error", "");
+        refresh();
+      }
+    } catch (ex) {
+      err("orders-error", String(ex), "取消失敗");
+    } finally {
+      button.disabled = false;
+      button.textContent = originalText || "取消";
+    }
+  };
+
+  const wireOrderActions = () => {
+    const list = document.getElementById("orders-list");
+    if (!list) return;
+    list.addEventListener("click", (event) => {
+      const button = event.target.closest(".order-cancel");
+      if (!button) return;
+      const orderId = button.dataset.orderId;
+      cancelOrder(orderId, button);
+    });
+  };
+
   document.addEventListener("DOMContentLoaded", () => {
     wireSideToggle();
     wireOrderForm();
-    wireOrderCancel();
+    wireOrderActions();
     refresh();
     setInterval(refresh, cfg.refreshMs || 10000);
   });
