@@ -1,6 +1,4 @@
 User Request Summary:
-- Implement DDD skeleton/stub for MEXC Spot V3 QRL/USDT.
-- Create value objects, entities, aggregates, and factory stubs.
-- Use existing generated/proto DTOs; no business logic.
-- No dashboard summary; no generic exchange abstractions.
-- Immediate action; minimal Python skeletons.
+- Analyze current repository state and identify remaining gaps or areas that need convergence.
+- Produce a concise report capturing missing pieces across layers and prioritized next steps.
+- Keep changes minimal (documentation-focused); note if tests were not run.
