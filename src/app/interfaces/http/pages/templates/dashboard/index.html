@@ -46,6 +46,11 @@
         <ul id="trades-list" class="trades-list"></ul>
         <div class="price-row error" id="trades-error" aria-live="polite"></div>
       </div>
+      <div class="card">
+        <h2>My Orders</h2>
+        <ul id="orders-list" class="orders-list"></ul>
+        <div class="price-row error" id="orders-error" aria-live="polite"></div>
+      </div>
     </div>
     <div class="card order-card">
       <h2>下單</h2>
@@ -93,6 +98,7 @@
       const balanceUrl = "/api/account/balance";
       const depthUrl = "/api/market/depth?limit=20";
       const tradesUrl = "/api/market/trades?limit=50";
+      const ordersUrl = "/api/trading/orders";
       const ctx = document.getElementById("klineChart").getContext("2d");
 
       let chart = new Chart(ctx, {
@@ -205,14 +211,36 @@
           .join("");
       }
 
+      function setOrders(payload) {
+        const el = document.getElementById("orders-list");
+        document.getElementById("orders-error").textContent = "";
+        const orders = payload || [];
+        const normalize = (o) => {
+          const side = o.side ?? "--";
+          const status = o.status ?? "--";
+          const price = o.price ?? o.limit_price ?? "--";
+          const qty = o.quantity ?? o.orig_qty ?? "--";
+          const id = o.order_id ?? o.orderId ?? "--";
+          return { side, status, price, qty, id };
+        };
+        el.innerHTML = orders
+          .slice(0, 20)
+          .map((o) => {
+            const n = normalize(o);
+            return `<li><span class="id">${n.id}</span><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="status">${n.status}</span></li>`;
+          })
+          .join("");
+      }
+
       async function refresh() {
         try {
-          const [priceResp, klineResp, balanceResp, depthResp, tradesResp] = await Promise.all([
+          const [priceResp, klineResp, balanceResp, depthResp, tradesResp, ordersResp] = await Promise.all([
             fetch(priceUrl),
             fetch(klineUrl),
             fetch(balanceUrl),
             fetch(depthUrl),
             fetch(tradesUrl),
+            fetch(ordersUrl),
           ]);
           if (priceResp.ok) {
             setPrice(await priceResp.json());
@@ -239,12 +267,19 @@
             const data = await tradesResp.json().catch(() => ({}));
             document.getElementById("trades-error").textContent = data.detail || "Trades 取得失敗";
           }
+          if (ordersResp.ok) {
+            setOrders(await ordersResp.json());
+          } else {
+            const data = await ordersResp.json().catch(() => ({}));
+            document.getElementById("orders-error").textContent = data.detail || "Orders 取得失敗";
+          }
         } catch (err) {
           console.error(err);
           document.getElementById("price-error").textContent = "連線錯誤";
           document.getElementById("balance-error").textContent = "連線錯誤";
           document.getElementById("depth-error").textContent = "連線錯誤";
           document.getElementById("trades-error").textContent = "連線錯誤";
+          document.getElementById("orders-error").textContent = "連線錯誤";
         }
       }
 
@@ -258,6 +293,7 @@
       );
       setDepth({ bids: [], asks: [] });
       setTrades([]);
+      setOrders([]);
 
       refresh();
       setInterval(refresh, 10000);
