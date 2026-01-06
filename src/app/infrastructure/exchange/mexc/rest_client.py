@@ -136,3 +136,11 @@ class MexcRestClient:
         if isinstance(result, list):
             return result
         return []
+
+    async def trades(self, *, symbol: str, limit: int = 50) -> list[dict[str, Any]]:
+        """Public recent trades."""
+        params = {"symbol": symbol, "limit": limit}
+        result = await self._request("GET", "/api/v3/trades", params=params)
+        if isinstance(result, list):
+            return result
+        return []
