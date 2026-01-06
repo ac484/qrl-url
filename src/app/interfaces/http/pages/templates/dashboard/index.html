@@ -101,34 +101,40 @@
       const ordersUrl = "/api/trading/orders";
       const ctx = document.getElementById("klineChart").getContext("2d");
 
-      let chart = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: [],
-          datasets: [
-            {
-              label: "Close",
-              data: [],
-              borderColor: "#2196f3",
-              fill: false,
-              tension: 0.2,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          scales: {
-            x: {
-              display: true,
-              ticks: { maxTicksLimit: 8 },
-            },
-            y: {
-              display: true,
-              beginAtZero: false,
-            },
-          },
-        },
-      });
+      let chart =
+        window.Chart && ctx
+          ? new Chart(ctx, {
+              type: "line",
+              data: {
+                labels: [],
+                datasets: [
+                  {
+                    label: "Close",
+                    data: [],
+                    borderColor: "#2196f3",
+                    fill: false,
+                    tension: 0.2,
+                  },
+                ],
+              },
+              options: {
+                responsive: true,
+                scales: {
+                  x: {
+                    display: true,
+                    ticks: { maxTicksLimit: 8 },
+                  },
+                  y: {
+                    display: true,
+                    beginAtZero: false,
+                  },
+                },
+              },
+            })
+          : {
+              data: { labels: [], datasets: [{ data: [] }] },
+              update: () => {},
+            };
 
       function setPrice(data) {
         document.getElementById("price-error").textContent = "";
@@ -282,18 +288,6 @@
           document.getElementById("orders-error").textContent = "連線錯誤";
         }
       }
-
-      // Seed with sample data so the page renders even without backend
-      setPrice({ bid: "0.1000", ask: "0.1010", last: "0.1005", timestamp: new Date().toISOString() });
-      setKlines(
-        Array.from({ length: 20 }, (_, i) => ({
-          close: (0.095 + i * 0.0005).toFixed(4),
-          timestamp: new Date(Date.now() - (20 - i) * 60000).toISOString(),
-        }))
-      );
-      setDepth({ bids: [], asks: [] });
-      setTrades([]);
-      setOrders([]);
 
       refresh();
       setInterval(refresh, 10000);

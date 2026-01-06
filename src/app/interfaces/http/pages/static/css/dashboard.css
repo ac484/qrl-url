@@ -5,8 +5,8 @@ body {
 
 .grid {
   display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
   align-items: start;
 }
 
@@ -33,6 +33,61 @@ body {
 
 canvas {
   max-width: 100%;
+}
+
+.depth-list,
+.trades-list,
+.orders-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 6px;
+}
+
+.depth-list li,
+.trades-list li,
+.orders-list li {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 6px 8px;
+  border-bottom: 1px solid #f2f2f2;
+  font-size: 0.92rem;
+}
+
+.depth-list li:last-child,
+.trades-list li:last-child,
+.orders-list li:last-child {
+  border-bottom: none;
+}
+
+.depth-list .price,
+.trades-list .price,
+.orders-list .price {
+  font-weight: 600;
+}
+
+.trades-list .side.buy,
+.orders-list .side.buy {
+  color: #2e7d32;
+  font-weight: 700;
+}
+
+.trades-list .side.sell,
+.orders-list .side.sell {
+  color: #c62828;
+  font-weight: 700;
+}
+
+.depth-col {
+  flex: 1;
+}
+
+.flex-row {
+  display: flex;
+  gap: 12px;
 }
 
 .order-card {
