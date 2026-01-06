@@ -1,4 +1,1 @@
-User Request Summary:
-- Analyze current repository state and identify remaining gaps or areas that need convergence.
-- Produce a concise report capturing missing pieces across layers and prioritized next steps.
-- Keep changes minimal (documentation-focused); note if tests were not run.
+User request: Analyze src/app/interfaces/http/pages/templates/dashboard/index.html for logic that can be moved to Python to improve clarity, project structure, performance, and single responsibility. Use Sequential-Thinking and Software-Planning-Tool methods. Implement minimal changes accordingly.
