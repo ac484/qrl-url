@@ -27,26 +27,22 @@
         <div class="price-row"><span class="label">USDT 冻结</span><span id="bal-usdt-locked" class="value">--</span></div>
         <div class="price-row error" id="balance-error" aria-live="polite"></div>
       </div>
-      <div class="card">
+      <div class="card depth-card">
         <h2>Depth (QRL/USDT)</h2>
-        <div class="flex-row">
-          <div class="depth-col">
-            <div class="label">Bids</div>
-            <ul id="depth-bids" class="depth-list"></ul>
-          </div>
-          <div class="depth-col">
-            <div class="label">Asks</div>
-            <ul id="depth-asks" class="depth-list"></ul>
-          </div>
+        <div class="vertical-stack">
+          <div class="label">Asks</div>
+          <ul id="depth-asks" class="depth-list"></ul>
+          <div class="label">Bids</div>
+          <ul id="depth-bids" class="depth-list"></ul>
         </div>
         <div class="price-row error" id="depth-error" aria-live="polite"></div>
       </div>
-      <div class="card">
+      <div class="card trades-card">
         <h2>Recent Trades</h2>
         <ul id="trades-list" class="trades-list"></ul>
         <div class="price-row error" id="trades-error" aria-live="polite"></div>
       </div>
-      <div class="card">
+      <div class="card orders-card">
         <h2>My Orders</h2>
         <ul id="orders-list" class="orders-list"></ul>
         <div class="price-row error" id="orders-error" aria-live="polite"></div>
