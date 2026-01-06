@@ -104,3 +104,36 @@ src/app
 - Dry-run and replay protection are implemented and testable without touching presentation code.  
 - Observability covers per-request logs/metrics; failure paths are surfaced without exposing secrets.  
 - Risks: MEXC API rate limits, Cloud Scheduler retries causing duplicate attempts, and Cloud Run cold starts increasing latency; mitigated via guards, caching, and replay window.
+
+## Execution plan (actionable, ready to land)
+- **Create strategy primitives (Dev)**  
+  - File: `src/app/domain/strategies/rebalance.py` with `RebalanceConfig`, `RebalancePlan`, `PlannedOrder`, `DecisionContext`, and what-if sizing helpers.  
+  - Tests: add unit tests under `tests/domain/strategies/test_rebalance.py` covering target band hits, cool-down, dry-run, and replay window.
+- **Add rebalance use case (Dev)**  
+  - File: `src/app/application/trading/use_cases/rebalance_qrl.py` orchestrating snapshot fetch → guards → plan → (optional) order placement.  
+  - Ensure async context enters `MexcService` internally; no controller context managers.  
+  - Tests: `tests/application/trading/test_rebalance_qrl.py` with mocked MexcService, verifying dry-run returns plan only.
+- **Wire task façades and route (Dev)**  
+  - Files: `src/app/interfaces/tasks/market_tasks.py`, `trading_tasks.py`, `entrypoints.py`; new route `src/app/interfaces/http/api/tasks_routes.py` exposing `POST /tasks/rebalance`.  
+  - Validate OIDC audience (`SCHEDULER_AUDIENCE`), `X-CloudScheduler` headers, and payload schema `{profile, dry_run, request_id}`; return DTO report.  
+  - Tests: `tests/interfaces/tasks/test_trading_tasks.py` (payload → DTO), `tests/interfaces/http/test_tasks_routes.py` (401 on bad audience, 200 on valid payload).
+- **Config and envs (DevOps)**  
+  - Update `.env.example` with `SCHEDULER_AUDIENCE`, `SCHEDULER_REPLAY_TTL_SEC`, `REBALANCE_PROFILE`, `REBALANCE_DRY_RUN_DEFAULT`, `MEXC_*`.  
+  - Add dry-run default and replay TTL into config loader; keep out of controllers.
+- **Scheduler job (DevOps)**  
+  - Cloud Scheduler job creation (example):  
+    ```
+    gcloud scheduler jobs create http rebalance-qrl \
+      --schedule="*/5 * * * *" \
+      --uri="https://<cloud-run-url>/tasks/rebalance" \
+      --oidc-service-account-email=<scheduler-sa>@<proj>.iam.gserviceaccount.com \
+      --oidc-token-audience="<cloud-run-audience>" \
+      --http-method=POST \
+      --headers="Content-Type=application/json" \
+      --message-body='{"profile":"default-qrl","dry_run":true}'
+    ```
+  - Ensure Cloud Run IAM allows the scheduler SA `run.invoker`.
+- **Observability (Dev)**  
+  - Structured JSON logs with fields: `request_id`, `profile`, `dry_run`, `orders_planned`, `orders_sent`, `latency_ms`, `status`, `error`.  
+  - Metrics hooks: count successes/failures and latency histogram around the use case entry.  
+  - Add execution UUID to responses and logs for replay detection.
