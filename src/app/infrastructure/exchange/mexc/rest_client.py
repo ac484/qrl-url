@@ -17,9 +17,15 @@ class MexcRestClient:
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> "MexcRestClient":
+        limits = httpx.Limits(
+            max_connections=self._settings.max_connections,
+            max_keepalive_connections=self._settings.max_keepalive_connections,
+            keepalive_expiry=self._settings.keepalive_expiry,
+        )
         self._client = httpx.AsyncClient(
             base_url=self._settings.base_url,
-            timeout=self._settings.timeout,
+            timeout=httpx.Timeout(self._settings.timeout),
+            limits=limits,
         )
         return self
 

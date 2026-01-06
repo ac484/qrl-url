@@ -1,1 +1,1 @@
-User request: Build an "allocation" endpoint for Cloud Scheduler to call in the qrl-url repository.
+User request: Optimize Cloud Run and Cloud Scheduler usage for MEXC V3 API workflow to avoid connection issues and excessive runtime. Use Context7 to consult MEXC V3 API docs and Google Cloud Run/Scheduler docs for stability improvements. Work within ac484/qrl-url repository in /home/runner/work/qrl-url/qrl-url.
