@@ -1,3 +1,4 @@
+import asyncio
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Query
@@ -8,6 +9,7 @@ from src.app.application.market.qrl.get_qrl_price import GetQrlPrice
 from src.app.application.trading.qrl.cancel_qrl_order import CancelQrlOrder
 from src.app.application.trading.qrl.get_qrl_order import GetQrlOrder
 from src.app.application.trading.qrl.place_qrl_order import PlaceQrlOrder
+from src.app.application.account.use_cases.get_balance import GetBalanceUseCase
 from src.app.domain.value_objects.qrl_price import QrlPrice
 from src.app.domain.value_objects.qrl_quantity import QrlQuantity
 from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
@@ -80,3 +82,31 @@ async def qrl_cancel_order(order_id: str):
 async def qrl_get_order(order_id: str):
     usecase = GetQrlOrder(_client())
     return await usecase.execute(order_id=order_id, client_order_id=None)
+
+
+@router.get("/summary")
+async def qrl_summary(
+    interval: str = Query(default="1m"),
+    kline_limit: int = Query(default=50, ge=1, le=500),
+    depth_limit: int = Query(default=50, ge=5, le=1000),
+):
+    """Aggregate price, kline, depth, and balance for dashboard consumption."""
+    price_uc = GetQrlPrice(_client())
+    kline_uc = GetQrlKline(_client(), interval=interval, limit=kline_limit)
+    depth_uc = GetQrlDepth(_client(), limit=depth_limit)
+    balance_uc = GetBalanceUseCase()
+
+    price_result, kline_result, depth_result, balance_result = await asyncio.gather(
+        price_uc.execute(), kline_uc.execute(), depth_uc.execute(), balance_uc.execute()
+    )
+
+    normalized_klines = [
+        {"timestamp": item[0], "open": item[1], "high": item[2], "low": item[3], "close": item[4], "volume": item[5]}
+        for item in kline_result
+    ]
+    return {
+        "price": price_result,
+        "klines": normalized_klines,
+        "depth": depth_result,
+        "balance": balance_result,
+    }
