@@ -6,7 +6,6 @@
   };
 
   const chartEl = $("klineChart");
-  const indicatorEl = $("indicatorChart");
 
   const priceChart =
     window.Chart && chartEl
@@ -15,7 +14,7 @@
           data: {
             labels: [],
             datasets: [
-              { label: "Close", data: [], borderColor: "#2196f3", fill: false, tension: 0.2, pointRadius: 0 },
+              { label: "Close", data: [], borderColor: "#2196f3", fill: false, tension: 0.2, pointRadius: 0, yAxisID: "y" },
               {
                 label: "MA200 (1d)",
                 data: [],
@@ -24,25 +23,8 @@
                 tension: 0.15,
                 borderDash: [6, 3],
                 pointRadius: 0,
+                yAxisID: "y",
               },
-            ],
-          },
-          options: {
-            responsive: true,
-            interaction: { intersect: false, mode: "index" },
-            plugins: { legend: { display: true } },
-            scales: { y: { title: { display: true, text: "Price" } } },
-          },
-        })
-      : { data: { labels: [], datasets: [{ data: [] }, { data: [] }] }, update() {} };
-
-  const indicatorChart =
-    window.Chart && indicatorEl
-      ? new Chart(indicatorEl.getContext("2d"), {
-          type: "line",
-          data: {
-            labels: [],
-            datasets: [
               {
                 label: "RSI 21",
                 data: [],
@@ -50,6 +32,7 @@
                 fill: false,
                 pointRadius: 0,
                 tension: 0.2,
+                yAxisID: "y1",
               },
               {
                 label: "Williams %R 21",
@@ -58,6 +41,7 @@
                 fill: false,
                 pointRadius: 0,
                 tension: 0.2,
+                yAxisID: "y1",
               },
             ],
           },
@@ -66,15 +50,18 @@
             interaction: { intersect: false, mode: "index" },
             plugins: { legend: { display: true } },
             scales: {
-              y: {
+              y: { title: { display: true, text: "Price" } },
+              y1: {
+                position: "right",
                 title: { display: true, text: "Oscillators" },
                 suggestedMin: -100,
                 suggestedMax: 100,
+                grid: { drawOnChartArea: false },
               },
             },
           },
         })
-      : { data: { labels: [], datasets: [{ data: [] }, { data: [] }] }, update() {} };
+      : { data: { labels: [], datasets: [{ data: [] }, { data: [] }, { data: [] }, { data: [] }] }, update() {} };
 
   const computeSMA = (values, period) => {
     const out = values.map(() => null);
@@ -154,12 +141,9 @@
     priceChart.data.labels = labels;
     priceChart.data.datasets[0].data = closes;
     priceChart.data.datasets[1].data = ma200;
+    priceChart.data.datasets[2].data = rsi21;
+    priceChart.data.datasets[3].data = williams21;
     priceChart.update();
-
-    indicatorChart.data.labels = labels;
-    indicatorChart.data.datasets[0].data = rsi21;
-    indicatorChart.data.datasets[1].data = williams21;
-    indicatorChart.update();
   };
 
   const setBalances = (payload = {}) => {
