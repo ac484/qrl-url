@@ -1,1 +1,6 @@
-User request: Fix balance/price/kline display issues; ensure structure and single responsibility; must use Context7 to check MEXC V3 API; avoid cognitive errors; issue shows QrlSettings SUB_ACCOUNT_ID validation failing (string 'trade0qrl' needs int) causing 500 errors on /api/qrl/price and /api/qrl/kline; balance endpoint 502. Ensure balance, price, kline display correctly using generated/proto MEXC clients.
+User Request Summary:
+- Implement DDD skeleton/stub for MEXC Spot V3 QRL/USDT.
+- Create value objects, entities, aggregates, and factory stubs.
+- Use existing generated/proto DTOs; no business logic.
+- No dashboard summary; no generic exchange abstractions.
+- Immediate action; minimal Python skeletons.
