@@ -107,12 +107,8 @@ async def test_allocation_buys_when_usdt_exceeds_qrl():
 
 @pytest.mark.asyncio
 async def test_allocation_falls_back_to_last_price_when_top_of_book_missing():
-    class StubPrice:
-        bid = Decimal("0")
-        ask = Decimal("0")
-        last = Decimal("0.25")
-
-    service = FakeService(qrl_free="0.1", usdt_free="1.5", price=StubPrice())
+    price = _make_price(bid="0.00000005", ask="0.00000005", last="0.25")
+    service = FakeService(qrl_free="0.1", usdt_free="1.5", price=price)
     usecase = AllocationUseCase(service_factory=lambda: service)
 
     result = await usecase.execute()
