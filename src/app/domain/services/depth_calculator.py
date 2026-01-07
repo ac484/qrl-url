@@ -9,10 +9,10 @@ class DepthCalculator:
     """Compute executable depth and weighted price for a side and target quantity."""
 
     def compute(self, book: OrderBook, side: Side, target: Quantity) -> tuple[Decimal, Decimal]:
-        levels = book.asks if side.value == "BUY" else book.bids
-        sorted_levels = sorted(
-            levels, key=lambda lvl: lvl.price, reverse=side.value == "SELL"
-        )
+        if side.value == "BUY":
+            sorted_levels = sorted(book.asks, key=lambda lvl: lvl.price)
+        else:
+            sorted_levels = sorted(book.bids, key=lambda lvl: lvl.price, reverse=True)
 
         remaining = target.value
         total = Decimal("0")

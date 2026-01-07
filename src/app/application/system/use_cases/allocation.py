@@ -23,12 +23,16 @@ from src.app.domain.value_objects.symbol import Symbol
 from src.app.domain.value_objects.time_in_force import TimeInForce
 from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
-DEFAULT_SYMBOL = Symbol("QRLUSDT")
-DEFAULT_TIME_IN_FORCE = TimeInForce("GTC")
-DEFAULT_LIMIT_PRICE = Decimal("1")
-DEFAULT_QUANTITY = Quantity(Decimal("1"))
-DEFAULT_DEPTH_LIMIT = 20
-DEFAULT_SLIPPAGE_THRESHOLD = Decimal("5")
+
+class AllocationConfig:
+    """Default configuration values for the allocation flow."""
+
+    SYMBOL = Symbol("QRLUSDT")
+    TIME_IN_FORCE = TimeInForce("GTC")
+    LIMIT_PRICE = Decimal("1")
+    TARGET_QUANTITY = Quantity(Decimal("1"))
+    DEPTH_LIMIT = 20
+    SLIPPAGE_THRESHOLD_PCT = Decimal("5")
 
 
 @dataclass(frozen=True)
@@ -52,18 +56,18 @@ class AllocationUseCase:
         self,
         service_factory: Callable[[], MexcService] | None = None,
         *,
-        depth_limit: int = DEFAULT_DEPTH_LIMIT,
-        slippage_threshold_pct: Decimal = DEFAULT_SLIPPAGE_THRESHOLD,
+        depth_limit: int = AllocationConfig.DEPTH_LIMIT,
+        slippage_threshold_pct: Decimal = AllocationConfig.SLIPPAGE_THRESHOLD_PCT,
         target_quantity: Quantity | None = None,
-        limit_price: Decimal = DEFAULT_LIMIT_PRICE,
+        limit_price: Decimal = AllocationConfig.LIMIT_PRICE,
     ):
         self._service_factory = service_factory or (lambda: build_mexc_service(MexcSettings()))
         self._comparison_rule = BalanceComparisonRule()
         self._depth_calculator = DepthCalculator()
         self._slippage_analyzer = SlippageAnalyzer(slippage_threshold_pct)
         self._depth_limit = depth_limit
-        self._target_quantity = target_quantity or DEFAULT_QUANTITY
-        self._limit_price = limit_price
+        self._target_quantity = target_quantity or AllocationConfig.TARGET_QUANTITY
+        self._limit_price = Decimal(limit_price)
 
     async def execute(self) -> AllocationResult:
         """Compare balances, evaluate depth/slippage, and submit a balancing order."""
@@ -76,7 +80,7 @@ class AllocationUseCase:
             if comparison.action == "skip" or comparison.preferred_side is None:
                 return _result_from_skip(request_id, executed_at, comparison)
 
-            order_book = await svc.get_depth(DEFAULT_SYMBOL, limit=self._depth_limit)
+            order_book = await svc.get_depth(AllocationConfig.SYMBOL, limit=self._depth_limit)
             filled, weighted_price = self._depth_calculator.compute(
                 order_book, comparison.preferred_side, self._target_quantity
             )
@@ -127,11 +131,11 @@ def _normalize_balances(account: Account) -> NormalizedBalances:
 
 def _build_order_command(*, side: Side, quantity: Quantity, limit_price: Decimal) -> OrderCommand:
     return OrderCommand(
-        symbol=DEFAULT_SYMBOL,
+        symbol=AllocationConfig.SYMBOL,
         side=side,
         quantity=quantity,
         price=Price.from_single(limit_price),
-        time_in_force=DEFAULT_TIME_IN_FORCE,
+        time_in_force=AllocationConfig.TIME_IN_FORCE,
     )
 
 

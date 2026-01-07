@@ -10,7 +10,7 @@ class DepthLevel:
     quantity: Decimal
 
     def __post_init__(self) -> None:
-        if self.price <= 0 or self.quantity <= 0:
+        if self.price <= Decimal("0") or self.quantity <= Decimal("0"):
             raise ValueError("DepthLevel price and quantity must be positive")
 
 

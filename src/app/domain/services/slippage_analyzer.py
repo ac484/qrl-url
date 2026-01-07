@@ -22,10 +22,13 @@ class SlippageAnalyzer:
         fill_quantity: Decimal,
         weighted_price: Decimal,
     ) -> SlippageAssessment:
+        if desired_price <= 0:
+            raise ValueError("Desired price must be positive")
+
         if fill_quantity <= 0:
             return SlippageAssessment(
                 expected_fill=Decimal("0"),
-                slippage_pct=Decimal("100"),
+                slippage_pct=Decimal("0"),
                 is_acceptable=False,
                 reason="No executable depth",
             )
@@ -33,15 +36,15 @@ class SlippageAnalyzer:
         if fill_quantity < target_quantity.value:
             return SlippageAssessment(
                 expected_fill=fill_quantity,
-                slippage_pct=Decimal("100"),
+                slippage_pct=Decimal("0"),
                 is_acceptable=False,
                 reason="Insufficient depth for target quantity",
             )
 
-        if desired_price <= 0:
-            raise ValueError("Desired price must be positive")
-
-        delta = weighted_price - desired_price if side.value == "BUY" else desired_price - weighted_price
+        if side.value == "BUY":
+            delta = weighted_price - desired_price
+        else:
+            delta = desired_price - weighted_price
         slippage_pct = (delta / desired_price) * Decimal("100")
 
         if delta <= 0:

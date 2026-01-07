@@ -13,7 +13,7 @@ class BalanceComparisonRule:
 
     def evaluate(self, balances: NormalizedBalances) -> BalanceComparisonResult:
         diff = balances.qrl_free - balances.usdt_free
-        if diff.copy_abs() <= self._tolerance:
+        if abs(diff) <= self._tolerance:
             return BalanceComparisonResult(
                 qrl_free=balances.qrl_free,
                 usdt_free=balances.usdt_free,

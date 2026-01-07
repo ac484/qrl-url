@@ -1,7 +1,7 @@
 """Mapping helpers between MEXC API payloads and domain objects."""
 
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from src.app.domain.entities.account import Account
@@ -101,11 +101,10 @@ def _parse_levels(raw: Any) -> list[DepthLevel]:
         try:
             price = _to_decimal(item[0])
             quantity = _to_decimal(item[1])
-        except Exception:
+            level = DepthLevel(price=price, quantity=quantity)
+        except (InvalidOperation, TypeError, ValueError):
             continue
-        if price <= 0 or quantity <= 0:
-            continue
-        levels.append(DepthLevel(price=price, quantity=quantity))
+        levels.append(level)
     return levels
 
 
