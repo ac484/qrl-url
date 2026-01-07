@@ -14,6 +14,7 @@ from src.app.domain.services.slippage_analyzer import SlippageAnalyzer
 from src.app.domain.value_objects.balance_comparison_result import BalanceComparisonResult
 from src.app.domain.value_objects.normalized_balances import NormalizedBalances
 from src.app.domain.value_objects.order_command import OrderCommand
+from src.app.domain.value_objects.order_book import OrderBook
 from src.app.domain.value_objects.order_type import OrderType
 from src.app.domain.value_objects.price import Price
 from src.app.domain.value_objects.quantity import Quantity
@@ -33,6 +34,7 @@ class AllocationConfig:
     TARGET_QUANTITY = Quantity(Decimal("1"))
     DEPTH_LIMIT = 20
     SLIPPAGE_THRESHOLD_PCT = Decimal("5")
+    PRICE_BUFFER_PCT = Decimal("0.001")  # 0.1%
 
 
 @dataclass(frozen=True)
@@ -84,9 +86,14 @@ class AllocationUseCase:
             filled, weighted_price = self._depth_calculator.compute(
                 order_book, comparison.preferred_side, self._target_quantity
             )
+            top_price = _best_price(order_book, comparison.preferred_side)
+            if top_price <= 0:
+                return _result_from_slippage(
+                    request_id, executed_at, SlippageAssessment(Decimal("0"), Decimal("0"), False, "No executable depth")
+                )
             slippage = self._slippage_analyzer.assess(
                 side=comparison.preferred_side,
-                desired_price=self._limit_price,
+                desired_price=top_price,
                 target_quantity=self._target_quantity,
                 fill_quantity=filled,
                 weighted_price=weighted_price,
@@ -94,8 +101,13 @@ class AllocationUseCase:
             if not slippage.is_acceptable:
                 return _result_from_slippage(request_id, executed_at, slippage)
 
+            dynamic_price = _compute_limit_price(
+                weighted_price=weighted_price,
+                side=comparison.preferred_side,
+                buffer_pct=AllocationConfig.PRICE_BUFFER_PCT,
+            )
             command = _build_order_command(
-                side=comparison.preferred_side, quantity=self._target_quantity, limit_price=self._limit_price
+                side=comparison.preferred_side, quantity=self._target_quantity, limit_price=dynamic_price
             )
             order = await svc.place_order(
                 PlaceOrderRequest(
@@ -137,6 +149,20 @@ def _build_order_command(*, side: Side, quantity: Quantity, limit_price: Decimal
         price=Price.from_single(limit_price),
         time_in_force=AllocationConfig.TIME_IN_FORCE,
     )
+
+
+def _best_price(book: OrderBook, side: Side) -> Decimal:
+    prices = [level.price for level in (book.asks if side.value == "BUY" else book.bids)]
+    if not prices:
+        return Decimal("0")
+    return min(prices) if side.value == "BUY" else max(prices)
+
+
+def _compute_limit_price(*, weighted_price: Decimal, side: Side, buffer_pct: Decimal) -> Decimal:
+    if weighted_price <= 0:
+        raise ValueError("Weighted price must be positive for limit calculation")
+    multiplier = Decimal("1") + buffer_pct if side.value == "BUY" else Decimal("1") - buffer_pct
+    return weighted_price * multiplier
 
 
 def _result_from_skip(
