@@ -1,2 +1,1 @@
-1. User request: Optimize Cloud Run and Cloud Scheduler usage for MEXC V3 API workflow to avoid connection issues and excessive runtime. Use Context7 to consult MEXC V3 API docs and Google Cloud Run/Scheduler docs for stability improvements. Work within ac484/qrl-url repository in /home/runner/work/qrl-url/qrl-url.
-2. User request: 分析自動在平衡/tasks/allocation 下訂單流程是否需要透過 /api/** 以保持一致性，並在 ac484/qrl-url 儲存庫中實作必要修正。
+User request: Translate cloud-scheduler-oidc.md to Traditional Chinese. Region: asia-southeast1. Container: qrl-trading-api. Project: qrl-api.
