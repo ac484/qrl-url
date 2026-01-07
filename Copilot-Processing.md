@@ -1,1 +1,1 @@
-User Request: Investigate production 500 at https://qrl-trading-api-545492969490.asia-southeast1.run.app/tasks/allocation while localhost works. Ensure env vars (MEXC_API_KEY, MEXC_SECRET_KEY) are considered. Repo: ac484/qrl-url, path /home/runner/work/qrl-url/qrl-url.
+User request: Update `src/app/interfaces/http/pages/templates/dashboard/index.html` changing `<h2>` and `<label>` text to Traditional Chinese.
