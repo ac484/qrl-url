@@ -1,1 +1,1 @@
-User request: Translate cloud-scheduler-oidc.md to Traditional Chinese. Region: asia-southeast1. Container: qrl-trading-api. Project: qrl-api.
+User requested: Update cloud-scheduler-oidc.md with a step-by-step Google Cloud Scheduler UI configuration guide covering Define the schedule, Configure the execution (Target type, URL, HTTP method, HTTP headers: Name/Value), Body, Auth header, Service account, Audience, and optional settings.

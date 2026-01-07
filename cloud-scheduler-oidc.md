@@ -80,6 +80,31 @@ gcloud scheduler jobs create http $JOB_NAME `
   --min-backoff=10s
 ```
 
+## 在 Google Cloud Console 建立排程（圖形介面傻瓜版）
+若偏好使用瀏覽器設定，可在 Google Cloud Console 依序填寫：
+
+1. 開啟 Cloud Scheduler → 按「建立工作」。
+2. **定義排程（Define the schedule）**
+   - 名稱：`qrl-trading-api-scheduler`（或你要的名稱）。
+   - 頻率：`*/5 * * * *`（五分鐘一次，依需求調整）。
+   - 時區：選擇服務所在時區（例如 `Asia/Taipei`）。
+3. **配置執行方式（Configure the execution）**
+   - Target type：選 **HTTP**。
+   - URL：Cloud Run 服務網址加路徑，例如
+     `https://qrl-trading-api-xxxx-uc.a.run.app/tasks/allocation`。
+   - HTTP method：選 **POST**。
+   - HTTP headers：Name 1 = `Content-Type`，Value 1 = `application/json`。
+   - Body：視需求填寫 JSON，沒有內容可留空或輸入 `{}`。
+4. **Auth header（身份驗證）**
+   - Service account：`scheduler@qrl-api.iam.gserviceaccount.com`。
+   - Audience：Cloud Run 服務的根 URL（不含路徑），例如
+     `https://qrl-trading-api-xxxx-uc.a.run.app`。
+5. **可選設定（Configure optional settings）**
+   - Max retry attempts：`3`。
+   - Min backoff：`10s`。
+   - Deadline/attempt deadline：`60s`。
+   - 其餘保持預設即可，確認後按「建立」。
+
 ## 驗證與測試
 - 檢查 IAM：`gcloud run services get-iam-policy qrl-trading-api --region=asia-southeast1`。
 - 執行單次觸發：`gcloud scheduler jobs run qrl-trading-api-scheduler --location=asia-southeast1`。
