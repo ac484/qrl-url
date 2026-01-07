@@ -27,10 +27,18 @@ class FakeService:
         *,
         bids: list[DepthLevel] | None = None,
         asks: list[DepthLevel] | None = None,
+        price_bid: str = "1",
+        price_ask: str = "1",
     ):
         self._qrl_free = Decimal(qrl_free)
         self._usdt_free = Decimal(usdt_free)
         self._book = OrderBook(bids=bids or [], asks=asks or [])
+        self._price = Price(
+            bid=Decimal(price_bid),
+            ask=Decimal(price_ask),
+            last=Decimal(price_bid),
+            timestamp=Timestamp(datetime.now(timezone.utc)),
+        )
         self.last_order_request: PlaceOrderRequest | None = None
 
     async def __aenter__(self):
@@ -51,6 +59,9 @@ class FakeService:
 
     async def get_depth(self, symbol: Symbol, limit: int = 50) -> OrderBook:
         return self._book
+
+    async def get_price(self, symbol: Symbol) -> Price:
+        return self._price
 
     async def place_order(self, request: PlaceOrderRequest) -> Order:
         self.last_order_request = request
@@ -122,3 +133,32 @@ async def test_allocation_places_order_when_slippage_ok():
     assert service.last_order_request.price.last == Decimal("1.00899")
     assert service.last_order_request.quantity.value == Decimal("1")
     assert service.last_order_request.time_in_force == TimeInForce("GTC")
+
+
+@pytest.mark.asyncio
+async def test_allocation_skips_when_value_balanced_but_qty_not():
+    # QRL qty > USDT qty, but price=0.5 makes values equal (1 USDT vs 1 USDT)
+    service = FakeService(qrl_free="2", usdt_free="1", price_bid="0.5", price_ask="0.5")
+    usecase = AllocationUseCase(service_factory=lambda: service)
+
+    result = await usecase.execute()
+
+    assert result.status == "skipped"
+    assert service.last_order_request is None
+
+
+@pytest.mark.asyncio
+async def test_allocation_rejects_when_price_unavailable(monkeypatch):
+    service = FakeService(qrl_free="0.5", usdt_free="1")
+
+    async def raise_price(symbol: Symbol):
+        raise RuntimeError("price failed")
+
+    service.get_price = raise_price  # type: ignore
+    usecase = AllocationUseCase(service_factory=lambda: service)
+
+    result = await usecase.execute()
+
+    assert result.status == "rejected"
+    assert result.reason == "Price unavailable"
+    assert service.last_order_request is None

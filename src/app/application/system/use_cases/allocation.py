@@ -11,6 +11,7 @@ from src.app.domain.entities.account import Account
 from src.app.domain.services.balance_comparison_rule import BalanceComparisonRule
 from src.app.domain.services.depth_calculator import DepthCalculator
 from src.app.domain.services.slippage_analyzer import SlippageAnalyzer
+from src.app.domain.services.valuation_service import ValuationService
 from src.app.domain.value_objects.balance_comparison_result import BalanceComparisonResult
 from src.app.domain.value_objects.normalized_balances import NormalizedBalances
 from src.app.domain.value_objects.order_command import OrderCommand
@@ -67,6 +68,7 @@ class AllocationUseCase:
         self._comparison_rule = BalanceComparisonRule()
         self._depth_calculator = DepthCalculator()
         self._slippage_analyzer = SlippageAnalyzer(slippage_threshold_pct)
+        self._valuation_service = ValuationService()
         self._depth_limit = depth_limit
         self._target_quantity = target_quantity or AllocationConfig.TARGET_QUANTITY
         self._limit_price = Decimal(limit_price)
@@ -77,7 +79,13 @@ class AllocationUseCase:
         executed_at = datetime.now(timezone.utc)
         async with self._service_factory() as svc:
             account = await svc.get_account()
-            balances = _normalize_balances(account)
+            try:
+                quote = await svc.get_price(AllocationConfig.SYMBOL)
+                mid_price = (quote.bid + quote.ask) / Decimal("2")
+            except Exception:
+                return _result_from_price_error(request_id, executed_at)
+
+            balances = _normalize_balances(account, mid_price, self._valuation_service)
             comparison = self._comparison_rule.evaluate(balances)
             if comparison.action == "skip" or comparison.preferred_side is None:
                 return _result_from_skip(request_id, executed_at, comparison)
@@ -129,8 +137,8 @@ class AllocationUseCase:
         )
 
 
-def _normalize_balances(account: Account) -> NormalizedBalances:
-    """Return normalized QRL/USDT balances with sane defaults."""
+def _normalize_balances(account: Account, mid_price: Decimal, valuation: ValuationService) -> NormalizedBalances:
+    """Return normalized balances in value terms (USDT + QRL*mid_price)."""
     qrl = Decimal("0")
     usdt = Decimal("0")
     for bal in account.balances:
@@ -138,7 +146,8 @@ def _normalize_balances(account: Account) -> NormalizedBalances:
             qrl = bal.free
         if bal.asset.upper() == "USDT":
             usdt = bal.free
-    return NormalizedBalances(qrl_free=qrl, usdt_free=usdt)
+    qrl_value = valuation.value(qrl, mid_price)
+    return NormalizedBalances(qrl_free=qrl_value, usdt_free=usdt)
 
 
 def _build_order_command(*, side: Side, quantity: Quantity, limit_price: Decimal) -> OrderCommand:
@@ -192,6 +201,19 @@ def _result_from_slippage(
         reason=slippage.reason,
         slippage_pct=slippage.slippage_pct,
         expected_fill=slippage.expected_fill,
+    )
+
+
+def _result_from_price_error(request_id: str, executed_at: datetime) -> AllocationResult:
+    return AllocationResult(
+        request_id=request_id,
+        status="rejected",
+        executed_at=executed_at,
+        action="REJECTED",
+        order_id=None,
+        reason="Price unavailable",
+        slippage_pct=None,
+        expected_fill=None,
     )
 
 
