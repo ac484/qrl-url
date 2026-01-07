@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
+import httpx
 
 import pytest
 from fastapi.testclient import TestClient
@@ -64,3 +65,18 @@ def test_allocation_endpoint_returns_504_on_timeout(monkeypatch):
 
     assert resp.status_code == 504
     assert resp.json()["detail"] == "Allocation task exceeded timeout"
+
+
+def test_allocation_endpoint_returns_502_on_upstream_error(monkeypatch):
+    app = create_app()
+    client = TestClient(app)
+
+    async def _upstream_failure():
+        raise httpx.HTTPError("mexc unreachable")
+
+    monkeypatch.setattr(entrypoints, "run_allocation", _upstream_failure)
+
+    resp = client.get("/tasks/allocation")
+
+    assert resp.status_code == 502
+    assert "mexc unreachable" in resp.json()["detail"]
