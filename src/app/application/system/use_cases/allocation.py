@@ -15,6 +15,7 @@ from src.app.domain.value_objects.side import Side
 from src.app.domain.value_objects.symbol import Symbol
 from src.app.domain.value_objects.time_in_force import TimeInForce
 from src.app.infrastructure.exchange.mexc.settings import MexcSettings
+from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
 
 
 @dataclass(frozen=True)
@@ -29,7 +30,7 @@ class AllocationResult:
 
 
 class AllocationUseCase:
-    """Check QRL:USDT balance ratio and place a 1-unit limit order at price 1."""
+    """Check QRL:USDT balance ratio and place a 1 USDT notional limit order at top-of-book."""
 
     def __init__(
         self,
@@ -44,13 +45,20 @@ class AllocationUseCase:
             account = await svc.get_account()
             qrl_free, usdt_free = _extract_balances(account)
             side = Side("SELL") if qrl_free > usdt_free else Side("BUY")
+            best_bid, best_ask = await _top_of_book()
+            quote_notional = Decimal("1")
+            if side.value == "BUY":
+                limit_price = best_ask
+            else:
+                limit_price = best_bid
+            quantity = quote_notional / limit_price
             order = await svc.place_order(
                 PlaceOrderRequest(
                     symbol=Symbol("QRLUSDT"),
                     side=side,
                     order_type=OrderType("LIMIT"),
-                    quantity=Quantity(Decimal("1")),
-                    price=Price.from_single(Decimal("1")),
+                    quantity=Quantity(quantity),
+                    price=Price.from_single(limit_price),
                     time_in_force=TimeInForce("GTC"),
                 )
             )
@@ -74,3 +82,17 @@ def _extract_balances(account: Account) -> tuple[Decimal, Decimal]:
         if bal.asset.upper() == "USDT":
             usdt = bal.free
     return qrl, usdt
+
+
+async def _top_of_book() -> tuple[Decimal, Decimal]:
+    """Fetch best bid/ask for QRL/USDT from the REST depth endpoint."""
+    settings = MexcSettings()
+    async with QrlRestClient(settings) as client:
+        depth = await client.depth(limit=5)
+    asks = depth.get("asks") or []
+    bids = depth.get("bids") or []
+    if not asks or not bids:
+        raise ValueError("Depth is empty; cannot derive top-of-book price")
+    best_ask = Decimal(asks[0][0])
+    best_bid = Decimal(bids[0][0])
+    return best_bid, best_ask
