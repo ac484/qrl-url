@@ -74,8 +74,7 @@
       .slice(0, 20)
       .map((t) => {
         const n = normalizeTrade(t);
-        const sideLabel = n.side === "BUY" ? "買" : n.side === "SELL" ? "賣" : n.side;
-        return `<li><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${sideLabel}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="ts">${n.ts}</span></li>`;
+        return `<li><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="ts">${n.ts}</span></li>`;
       })
       .join("");
   };
@@ -120,11 +119,10 @@
         .slice(0, 20)
         .map((o) => {
           const n = normalizeOrder(o);
-          const sideLabel = n.side === "BUY" ? "買" : n.side === "SELL" ? "賣" : n.side;
           const action = n.canCancel
             ? `<button class="order-cancel" data-order-id="${n.id}" aria-label="取消訂單 ${n.id}">取消</button>`
             : `<span class="status-label">${n.status}</span>`;
-          return `<li data-order-id="${n.id}"><span class="id">${n.id}</span><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${sideLabel}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="amount">${n.amount}</span><span class="status">${n.status}</span><span class="action">${action}</span></li>`;
+          return `<li data-order-id="${n.id}"><span class="id">${n.id}</span><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="amount">${n.amount}</span><span class="status">${n.status}</span><span class="action">${action}</span></li>`;
         })
         .join("");
   };
