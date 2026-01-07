@@ -1,1 +1,3 @@
-User request: Update `src/app/interfaces/http/pages/templates/dashboard/index.html` changing `<h2>` and `<label>` text to Traditional Chinese.
+User Request:
+- Analyze project section /tasks/allocation > proportion analysis > place order.
+- Return all files involved in full /tasks/allocation flow in the RP (report/response).
