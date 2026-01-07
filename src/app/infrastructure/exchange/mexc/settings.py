@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,7 +8,10 @@ class MexcSettings(BaseSettings):
     """Configuration for MEXC REST client."""
 
     api_key: str = Field(alias="MEXC_API_KEY")
-    api_secret: str = Field(alias="MEXC_SECRET_KEY")
+    api_secret: str = Field(
+        alias="MEXC_SECRET_KEY",
+        validation_alias=AliasChoices("MEXC_SECRET_KEY", "MEXC_API_SECRET"),
+    )
     base_url: str = Field(default="https://api.mexc.com", alias="MEXC_BASE_URL")
     recv_window: int = Field(default=5000, alias="MEXC_RECV_WINDOW")
     timeout: int = Field(default=10, alias="MEXC_TIMEOUT")
