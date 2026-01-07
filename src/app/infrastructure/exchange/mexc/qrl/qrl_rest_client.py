@@ -24,9 +24,7 @@ class QrlRestClient:
         return await self._client.klines(symbol=QrlUsdtPair.symbol(), interval=interval, limit=limit)
 
     async def depth(self, *, limit: int = 50) -> dict:
-        return await self._client._request(  # type: ignore[attr-defined]
-            "GET", "/api/v3/depth", params={"symbol": QrlUsdtPair.symbol(), "limit": limit}
-        )
+        return await self._client.depth(symbol=QrlUsdtPair.symbol(), limit=limit)
 
     async def market_trades(self, *, limit: int = 50) -> list:
         return await self._client.trades(symbol=QrlUsdtPair.symbol(), limit=limit)

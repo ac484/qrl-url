@@ -150,3 +150,7 @@ class MexcRestClient:
         if isinstance(result, list):
             return result
         return []
+
+    async def depth(self, *, symbol: str, limit: int = 50) -> dict[str, Any]:
+        params: dict[str, Any] = {"symbol": symbol, "limit": limit}
+        return await self._request("GET", "/api/v3/depth", params=params)

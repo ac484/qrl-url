@@ -8,6 +8,7 @@ from src.app.domain.entities.account import Account
 from src.app.domain.entities.order import Order
 from src.app.domain.entities.trade import Trade
 from src.app.domain.value_objects.balance import Balance
+from src.app.domain.value_objects.order_book import DepthLevel, OrderBook
 from src.app.domain.value_objects.order_id import OrderId
 from src.app.domain.value_objects.order_status import OrderStatus
 from src.app.domain.value_objects.order_type import OrderType
@@ -88,3 +89,29 @@ def trade_from_api(payload: dict[str, Any]) -> Trade:
         fee_asset=payload.get("commissionAsset"),
         timestamp=_to_timestamp_from_ms(payload.get("time", 0)),
     )
+
+
+def _parse_levels(raw: Any) -> list[DepthLevel]:
+    levels: list[DepthLevel] = []
+    if not isinstance(raw, list):
+        return levels
+    for item in raw:
+        if not isinstance(item, (list, tuple)) or len(item) < 2:
+            continue
+        try:
+            price = _to_decimal(item[0])
+            quantity = _to_decimal(item[1])
+        except Exception:
+            continue
+        if price <= 0 or quantity <= 0:
+            continue
+        levels.append(DepthLevel(price=price, quantity=quantity))
+    return levels
+
+
+def order_book_from_api(payload: dict[str, Any]) -> OrderBook:
+    """Map depth payload to an OrderBook VO."""
+
+    bids = _parse_levels(payload.get("bids", []))
+    asks = _parse_levels(payload.get("asks", []))
+    return OrderBook(bids=bids, asks=asks)
