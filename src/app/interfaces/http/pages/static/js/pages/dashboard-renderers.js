@@ -79,7 +79,13 @@
       .join("");
   };
 
-  const normalizeOrder = (o = {}) => ({ side: o.side ?? "--", status: o.status ?? "--", price: o.price ?? o.limit_price ?? "--", qty: o.quantity ?? o.orig_qty ?? "--", id: o.order_id ?? o.orderId ?? "--" });
+  const normalizeOrder = (o = {}) => ({
+    side: o.side ?? "--",
+    status: o.status ?? "--",
+    price: o.price ?? o.limit_price ?? "--",
+    qty: o.quantity ?? o.orig_qty ?? "--",
+    id: o.order_id ?? o.orderId ?? "--",
+  });
 
   const setOrders = (payload = []) => {
     setText("orders-error", "");
@@ -89,7 +95,9 @@
       .slice(0, 20)
       .map((o) => {
         const n = normalizeOrder(o);
-        return `<li><span class="id">${n.id}</span><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="status">${n.status}</span></li>`;
+        const canCancel = n.status === "NEW" || n.status === "PARTIALLY_FILLED";
+        const btn = canCancel ? `<button type="button" class="cancel-btn" data-id="${n.id}">取消</button>` : "";
+        return `<li><span class="id">${n.id}</span><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="status">${n.status}</span>${btn}</li>`;
       })
       .join("");
   };

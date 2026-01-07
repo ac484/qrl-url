@@ -15,6 +15,35 @@
   };
 
   const err = (id, detail, fallback) => ui.setText(id, detail || fallback);
+  const orderApi = window.orderDomain || {};
+  const ordersList = document.getElementById("orders-list");
+  const ordersError = document.getElementById("orders-error");
+
+  const setOrdersMessage = (msg) => {
+    if (ordersError) ordersError.textContent = msg || "";
+  };
+
+  const wireOrderCancel = () => {
+    if (!ordersList || !orderApi.cancelOrder) return;
+    ordersList.addEventListener("click", async (evt) => {
+      const btn = evt.target.closest(".cancel-btn");
+      if (!btn) return;
+      const orderId = btn.dataset.id;
+      if (!orderId) return;
+      btn.disabled = true;
+      btn.textContent = "取消中...";
+      setOrdersMessage("");
+      try {
+        await orderApi.cancelOrder(cfg, orderId);
+        btn.textContent = "已送出";
+        await refresh();
+      } catch (ex) {
+        btn.disabled = false;
+        btn.textContent = "取消";
+        setOrdersMessage(ex.message || "取消失敗");
+      }
+    });
+  };
 
   async function refresh() {
     try {
@@ -83,6 +112,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     wireSideToggle();
     wireOrderForm();
+    wireOrderCancel();
     refresh();
     setInterval(refresh, cfg.refreshMs || 10000);
   });
