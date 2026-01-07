@@ -15,6 +15,7 @@ class MexcRestClient:
     def __init__(self, settings: MexcSettings):
         self._settings = settings
         self._client: httpx.AsyncClient | None = None
+        self._time_offset_ms: int = 0
 
     async def __aenter__(self) -> "MexcRestClient":
         limits = httpx.Limits(
@@ -27,6 +28,7 @@ class MexcRestClient:
             timeout=httpx.Timeout(self._settings.timeout),
             limits=limits,
         )
+        await self._sync_time()
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
@@ -46,7 +48,7 @@ class MexcRestClient:
                 payload.setdefault("subAccount", self._settings.sub_account_name)
         elif self._settings.sub_account_id is not None:
             payload.setdefault("subAccountId", self._settings.sub_account_id)
-        payload.setdefault("timestamp", int(time.time() * 1000))
+        payload.setdefault("timestamp", int(time.time() * 1000 + self._time_offset_ms))
         payload.setdefault("recvWindow", self._settings.recv_window)
         query = urlencode(payload, doseq=True)
         signature = hmac.new(
@@ -154,3 +156,14 @@ class MexcRestClient:
     async def exchange_info(self, *, symbol: str) -> dict[str, Any]:
         params = {"symbol": symbol}
         return await self._request("GET", "/api/v3/exchangeInfo", params=params)
+
+    async def _sync_time(self) -> None:
+        """Fetch server time to offset local timestamps for signed requests."""
+        client = self._assert_client()
+        response = await client.get("/api/v3/time")
+        response.raise_for_status()
+        payload = response.json()
+        server_time = payload.get("serverTime") or payload.get("server_time")
+        if server_time:
+            local_ms = int(time.time() * 1000)
+            self._time_offset_ms = int(server_time) - local_ms
