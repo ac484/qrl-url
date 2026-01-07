@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN
 import pytest
 
 from src.app.application.exchange.mexc_service import PlaceOrderRequest
@@ -19,9 +19,10 @@ from src.app.domain.value_objects.timestamp import Timestamp
 
 
 class FakeService:
-    def __init__(self, qrl_free: str, usdt_free: str):
+    def __init__(self, qrl_free: str, usdt_free: str, price: Price):
         self._qrl_free = Decimal(qrl_free)
         self._usdt_free = Decimal(usdt_free)
+        self._price = price
         self.last_order_request: PlaceOrderRequest | None = None
 
     async def __aenter__(self):
@@ -40,6 +41,9 @@ class FakeService:
             ],
         )
 
+    async def get_price(self, symbol: Symbol) -> Price:  # pragma: no cover - simple passthrough
+        return self._price
+
     async def place_order(self, request: PlaceOrderRequest) -> Order:
         self.last_order_request = request
         return Order(
@@ -55,9 +59,16 @@ class FakeService:
         )
 
 
+def _make_price(bid: str, ask: str, last: str | None = None) -> Price:
+    ts = Timestamp(datetime(2026, 1, 1, tzinfo=timezone.utc))
+    last_value = Decimal(last) if last is not None else Decimal(ask)
+    return Price(bid=Decimal(bid), ask=Decimal(ask), last=last_value, timestamp=ts)
+
+
 @pytest.mark.asyncio
 async def test_allocation_sells_when_qrl_exceeds_usdt():
-    service = FakeService(qrl_free="2", usdt_free="1")
+    price = _make_price(bid="0.09876", ask="0.10123")
+    service = FakeService(qrl_free="2", usdt_free="1", price=price)
     usecase = AllocationUseCase(service_factory=lambda: service)
 
     result = await usecase.execute()
@@ -67,14 +78,17 @@ async def test_allocation_sells_when_qrl_exceeds_usdt():
     assert result.order_id == "test-order"
     assert service.last_order_request is not None
     assert service.last_order_request.side.value == "SELL"
+    limit_price = Decimal("0.09876").quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
+    expected_qty = (Decimal("1") / limit_price).quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
     assert service.last_order_request.price is not None
-    assert service.last_order_request.price.last == Decimal("1")
-    assert service.last_order_request.quantity.value == Decimal("1")
+    assert service.last_order_request.price.last == limit_price
+    assert service.last_order_request.quantity.value == expected_qty
 
 
 @pytest.mark.asyncio
 async def test_allocation_buys_when_usdt_exceeds_qrl():
-    service = FakeService(qrl_free="0.5", usdt_free="5")
+    price = _make_price(bid="0.12000", ask="0.12345")
+    service = FakeService(qrl_free="0.5", usdt_free="5", price=price)
     usecase = AllocationUseCase(service_factory=lambda: service)
 
     result = await usecase.execute()
@@ -84,6 +98,30 @@ async def test_allocation_buys_when_usdt_exceeds_qrl():
     assert result.order_id == "test-order"
     assert service.last_order_request is not None
     assert service.last_order_request.side.value == "BUY"
+    limit_price = Decimal("0.12345").quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
+    expected_qty = (Decimal("1") / limit_price).quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
     assert service.last_order_request.price is not None
-    assert service.last_order_request.price.last == Decimal("1")
-    assert service.last_order_request.quantity.value == Decimal("1")
+    assert service.last_order_request.price.last == limit_price
+    assert service.last_order_request.quantity.value == expected_qty
+
+
+@pytest.mark.asyncio
+async def test_allocation_falls_back_to_last_price_when_top_of_book_missing():
+    class StubPrice:
+        bid = Decimal("0")
+        ask = Decimal("0")
+        last = Decimal("0.25")
+
+    service = FakeService(qrl_free="0.1", usdt_free="1.5", price=StubPrice())
+    usecase = AllocationUseCase(service_factory=lambda: service)
+
+    result = await usecase.execute()
+
+    assert result.status == "ok"
+    assert result.action == "BUY"
+    assert service.last_order_request is not None
+    limit_price = Decimal("0.25").quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
+    expected_qty = (Decimal("1") / limit_price).quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
+    assert service.last_order_request.price is not None
+    assert service.last_order_request.price.last == limit_price
+    assert service.last_order_request.quantity.value == expected_qty

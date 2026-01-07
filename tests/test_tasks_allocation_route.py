@@ -80,3 +80,18 @@ def test_allocation_endpoint_returns_502_on_upstream_error(monkeypatch):
 
     assert resp.status_code == 502
     assert "mexc unreachable" in resp.json()["detail"]
+
+
+def test_allocation_endpoint_returns_502_on_invalid_quote(monkeypatch):
+    app = create_app()
+    client = TestClient(app)
+
+    async def _invalid_quote():
+        raise ValueError("quote missing")
+
+    monkeypatch.setattr(entrypoints, "run_allocation", _invalid_quote)
+
+    resp = client.get("/tasks/allocation")
+
+    assert resp.status_code == 502
+    assert "quote missing" in resp.json()["detail"]

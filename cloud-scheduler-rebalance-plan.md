@@ -20,6 +20,13 @@ post_date: 2026-01-06
 ## Purpose
 Identify the missing pieces to let Cloud Scheduler call this Cloud Run service to execute a QRL/USDT rebalancing strategy, confirm MEXC Spot API v3 coverage via Context7, and propose a concrete implementation path that preserves single-responsibility/DDD boundaries.
 
+## Current auto-allocation pricing (live behavior)
+- `/tasks/allocation` still chooses BUY vs SELL by comparing free QRL vs USDT balances.
+- The limit price is derived from the live top-of-book: best ask for BUY, best bid for SELL (via `/api/v3/ticker/24hr`), rounded down to the QRL tick size (`0.0001`).
+- Order size is normalized to ~1 USDT notional (`1 / price`), rounded down to `0.000001` to avoid over-sizing.
+- If bid/ask are absent or zero, the allocator falls back to the last traded price; invalid quotes fail fast.
+- Orders are submitted as GTC LIMITs with the normalized price/size.
+
 ## Current structure (focused tree)
 ```
 src/app

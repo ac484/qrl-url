@@ -19,7 +19,7 @@ async def _trigger_allocation() -> AllocationResponse:
         result = await entrypoints.run_allocation()
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="Allocation task exceeded timeout")
-    except (ValidationError, httpx.HTTPError) as exc:
+    except (ValidationError, httpx.HTTPError, ValueError) as exc:
         logger.exception("Allocation failed due to configuration or upstream API error")
         raise HTTPException(status_code=502, detail=str(exc))
     except Exception:

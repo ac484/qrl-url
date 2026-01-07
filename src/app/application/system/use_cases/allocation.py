@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN
 from typing import Callable
 from uuid import uuid4
 
@@ -29,7 +29,7 @@ class AllocationResult:
 
 
 class AllocationUseCase:
-    """Check QRL:USDT balance ratio and place a 1-unit limit order at price 1."""
+    """Check QRL:USDT balance ratio and place a 1 USDT notional limit order at top-of-book."""
 
     def __init__(
         self,
@@ -44,13 +44,17 @@ class AllocationUseCase:
             account = await svc.get_account()
             qrl_free, usdt_free = _extract_balances(account)
             side = Side("SELL") if qrl_free > usdt_free else Side("BUY")
+            symbol = Symbol("QRLUSDT")
+            quote = await svc.get_price(symbol)
+            limit_price = _select_limit_price(quote, side)
+            quantity = _size_for_notional(limit_price)
             order = await svc.place_order(
                 PlaceOrderRequest(
-                    symbol=Symbol("QRLUSDT"),
+                    symbol=symbol,
                     side=side,
                     order_type=OrderType("LIMIT"),
-                    quantity=Quantity(Decimal("1")),
-                    price=Price.from_single(Decimal("1")),
+                    quantity=quantity,
+                    price=Price.from_single(limit_price),
                     time_in_force=TimeInForce("GTC"),
                 )
             )
@@ -74,3 +78,20 @@ def _extract_balances(account: Account) -> tuple[Decimal, Decimal]:
         if bal.asset.upper() == "USDT":
             usdt = bal.free
     return qrl, usdt
+
+
+def _select_limit_price(quote: Price, side: Side) -> Decimal:
+    """Choose a limit price from the top-of-book and align to tick size."""
+    raw = quote.ask if side.value == "BUY" else quote.bid
+    candidate = raw if raw > 0 else quote.last
+    if candidate <= 0:
+        raise ValueError("Allocation cannot proceed without a positive quote")
+    return candidate.quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
+
+
+def _size_for_notional(limit_price: Decimal) -> Quantity:
+    """Size the order to approximately 1 USDT notional, rounded down."""
+    qty = (Decimal("1") / limit_price).quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
+    if qty <= 0:
+        raise ValueError("Computed allocation size is non-positive")
+    return Quantity(qty)
