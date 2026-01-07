@@ -32,3 +32,11 @@ class MexcSettings(BaseSettings):
         if isinstance(value, str) and value.strip() == "":
             return None
         return value
+
+    @field_validator("api_key", "api_secret")
+    @classmethod
+    def _strip_whitespace(cls, value: str) -> str:
+        cleaned = value.strip()
+        if "\n" in cleaned or "\r" in cleaned:
+            cleaned = cleaned.replace("\n", "").replace("\r", "")
+        return cleaned
