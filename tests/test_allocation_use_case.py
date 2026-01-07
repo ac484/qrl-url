@@ -85,7 +85,10 @@ async def test_allocation_rejects_on_slippage():
     service = FakeService(
         qrl_free="0.1",
         usdt_free="5",
-        asks=[DepthLevel(price=Decimal("2"), quantity=Decimal("1"))],
+        asks=[
+            DepthLevel(price=Decimal("1"), quantity=Decimal("0.1")),
+            DepthLevel(price=Decimal("2.5"), quantity=Decimal("1")),
+        ],
     )
     usecase = AllocationUseCase(service_factory=lambda: service, slippage_threshold_pct=Decimal("5"))
 
@@ -116,6 +119,6 @@ async def test_allocation_places_order_when_slippage_ok():
     assert service.last_order_request is not None
     assert service.last_order_request.side.value == "SELL"
     assert service.last_order_request.price is not None
-    assert service.last_order_request.price.last == Decimal("1")
+    assert service.last_order_request.price.last == Decimal("1.00899")
     assert service.last_order_request.quantity.value == Decimal("1")
     assert service.last_order_request.time_in_force == TimeInForce("GTC")
