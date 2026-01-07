@@ -1,1 +1,1 @@
-User requested: Update cloud-scheduler-oidc.md with a step-by-step Google Cloud Scheduler UI configuration guide covering Define the schedule, Configure the execution (Target type, URL, HTTP method, HTTP headers: Name/Value), Body, Auth header, Service account, Audience, and optional settings.
+User request: Fix 500 error on production endpoint https://qrl-trading-api-545492969490.asia-southeast1.run.app/tasks/allocation while local http://localhost:8080/tasks/allocation works. Apply minimal changes per instructions.
