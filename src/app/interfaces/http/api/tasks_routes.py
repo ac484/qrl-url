@@ -1,12 +1,16 @@
 import asyncio
+import logging
 
 from fastapi import APIRouter, HTTPException
+import httpx
+from pydantic import ValidationError
 
 from src.app.interfaces.http.schemas import AllocationResponse
 from src.app.interfaces.tasks import entrypoints
 
 router = APIRouter()
 api_router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 async def _trigger_allocation() -> AllocationResponse:
@@ -15,6 +19,12 @@ async def _trigger_allocation() -> AllocationResponse:
         result = await entrypoints.run_allocation()
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="Allocation task exceeded timeout")
+    except (ValidationError, httpx.HTTPError) as exc:
+        logger.exception("Allocation failed due to configuration or upstream API error")
+        raise HTTPException(status_code=502, detail=str(exc))
+    except Exception:
+        logger.exception("Unexpected allocation failure")
+        raise HTTPException(status_code=500, detail="Allocation task failed")
     return AllocationResponse.model_validate(result)
 
 
