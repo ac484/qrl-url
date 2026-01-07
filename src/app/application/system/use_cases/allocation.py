@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal, ROUND_DOWN, ROUND_UP
 from typing import Callable
 from uuid import uuid4
 
@@ -100,10 +100,12 @@ def _select_limit_price(quote: Price, side: Side, filters: SymbolFilters) -> Dec
 
 
 def _size_for_notional(limit_price: Decimal, filters: SymbolFilters) -> Quantity:
-    """Size the order to approximately 1 USDT notional, rounded down."""
-    raw_qty = filters.min_notional / limit_price
-    qty = max(raw_qty, filters.min_qty)
-    qty = qty.quantize(filters.step_size, rounding=ROUND_DOWN)
+    """Size the order to meet/exceed min notional while respecting lot size."""
+    target_qty = (filters.min_notional / limit_price).quantize(filters.step_size, rounding=ROUND_UP)
+    qty = max(target_qty, filters.min_qty)
+    # Ensure rounding doesn't push us back under min notional
+    if qty * limit_price < filters.min_notional:
+        qty = (filters.min_notional / limit_price).quantize(filters.step_size, rounding=ROUND_UP)
     if qty <= 0:
         raise ValueError("Computed allocation size is non-positive")
     return Quantity(qty)

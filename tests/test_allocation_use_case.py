@@ -3,7 +3,7 @@ from decimal import Decimal, ROUND_DOWN
 import pytest
 
 from src.app.application.exchange.mexc_service import PlaceOrderRequest, SymbolFilters
-from src.app.application.system.use_cases.allocation import AllocationUseCase
+from src.app.application.system.use_cases.allocation import AllocationUseCase, _size_for_notional
 from src.app.domain.entities.account import Account
 from src.app.domain.entities.order import Order
 from src.app.domain.value_objects.balance import Balance
@@ -16,6 +16,16 @@ from src.app.domain.value_objects.side import Side
 from src.app.domain.value_objects.symbol import Symbol
 from src.app.domain.value_objects.time_in_force import TimeInForce
 from src.app.domain.value_objects.timestamp import Timestamp
+
+
+@pytest.fixture
+def filters() -> SymbolFilters:
+    return SymbolFilters(
+        tick_size=Decimal("0.0001"),
+        step_size=Decimal("0.000001"),
+        min_qty=Decimal("0.000001"),
+        min_notional=Decimal("1"),
+    )
 
 
 class FakeService:
@@ -88,7 +98,7 @@ async def test_allocation_sells_when_qrl_exceeds_usdt():
     assert service.last_order_request is not None
     assert service.last_order_request.side.value == "SELL"
     limit_price = Decimal("0.09876").quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
-    expected_qty = (Decimal("1") / limit_price).quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
+    expected_qty = _size_for_notional(limit_price, service.filters).value
     assert service.last_order_request.price is not None
     assert service.last_order_request.price.last == limit_price
     assert service.last_order_request.quantity.value == expected_qty
@@ -108,7 +118,7 @@ async def test_allocation_buys_when_usdt_exceeds_qrl():
     assert service.last_order_request is not None
     assert service.last_order_request.side.value == "BUY"
     limit_price = Decimal("0.12345").quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
-    expected_qty = (Decimal("1") / limit_price).quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
+    expected_qty = _size_for_notional(limit_price, service.filters).value
     assert service.last_order_request.price is not None
     assert service.last_order_request.price.last == limit_price
     assert service.last_order_request.quantity.value == expected_qty
@@ -126,7 +136,21 @@ async def test_allocation_falls_back_to_last_price_when_top_of_book_missing():
     assert result.action == "BUY"
     assert service.last_order_request is not None
     limit_price = Decimal("0.25").quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
-    expected_qty = (Decimal("1") / limit_price).quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
+    expected_qty = _size_for_notional(limit_price, service.filters).value
     assert service.last_order_request.price is not None
     assert service.last_order_request.price.last == limit_price
     assert service.last_order_request.quantity.value == expected_qty
+
+
+def test_size_for_notional_rounded_minimal_notional(filters: SymbolFilters):
+    price = Decimal("2.0000")
+    qty = _size_for_notional(price, filters)
+    assert qty.value * price >= filters.min_notional
+    assert qty.value == Decimal("0.500000")
+
+
+def test_size_for_notional_rounds_up_to_meet_notional(filters: SymbolFilters):
+    price = Decimal("2.4180")
+    qty = _size_for_notional(price, filters)
+    assert qty.value * price >= filters.min_notional
+    assert qty.value >= filters.min_qty
