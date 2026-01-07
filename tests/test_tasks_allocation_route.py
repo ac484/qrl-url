@@ -37,6 +37,20 @@ def test_allocation_endpoint_allows_get_and_returns_payload():
     assert data["request_id"] == "mock-req"
 
 
+def test_allocation_endpoint_available_under_api_prefix():
+    app = create_app()
+    client = TestClient(app)
+
+    resp = client.get("/api/tasks/allocation")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert data["action"] == "BUY"
+    assert data["order_id"] == "mock-order"
+    assert data["request_id"] == "mock-req"
+
+
 def test_allocation_endpoint_returns_504_on_timeout(monkeypatch):
     app = create_app()
     client = TestClient(app)
