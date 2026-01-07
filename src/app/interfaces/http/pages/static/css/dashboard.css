@@ -30,8 +30,8 @@ body {
   grid-template-areas:
     "price kline orderform"
     "depth kline orderform"
-    "trades trades orders"
-    "balances balances orders";
+    "trades kline balances"
+    "trades kline orders";
   gap: 12px;
   align-items: start;
 }
@@ -45,8 +45,8 @@ body {
       "orderform"
       "depth"
       "trades"
-      "orders"
-      "balances";
+      "balances"
+      "orders";
   }
 }
 
