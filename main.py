@@ -52,6 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(trading_api.router, tags=["price"])
     app.include_router(ws_routes.router, prefix="/ws", tags=["ws"])
     app.include_router(tasks_routes.router, prefix="/tasks", tags=["tasks"])
+    app.include_router(tasks_routes.api_router, prefix="/api/tasks", tags=["tasks"])
     app.include_router(dashboard_routes.router, tags=["pages"])
     app.get("/", response_class=dashboard_routes.HTMLResponse)(dashboard_routes.dashboard)
 
