@@ -56,6 +56,11 @@ src/app
 - Scheduler/auth/config gaps: Cloud Run deployment (cloudbuild.yaml) omits scheduler auth bindings, expected headers (X-CloudScheduler-*) validation, and replay protection; .env example has strategy knobs but no scheduler payload schema or OIDC audience value.
 - Observability and tests: no fast tests for guards/sizing, no task-level logging/metrics to trace scheduler executions, and no dry-run mode to avoid unintended live trades.
 
+## Current auto-allocation pricing (RP response)
+- The only automated balance action today is `AllocationUseCase` (`src/app/application/system/use_cases/allocation.py`), triggered via `/tasks/allocation`.
+- It compares free QRL vs USDT to pick side, then submits a `LIMIT` order with `quantity=1` and `price=Price.from_single(Decimal("1"))`.
+- The price standard is therefore hard-coded to `1` USDT (not derived from ticker/depth or strategy config); this is the current source of the balancing order price.
+
 ## Implementation steps (ordered, keep DDD boundaries)
 1) **Define strategy domain + DTOs**: add a `domain/strategies/rebalance.py` (target weights, thresholds, cool-down) plus DTOs for computed orders; ensure VOs (Price, Quantity, QrlUsdtPair) are reused.
 2) **Application use case**: create `application/trading/use_cases/rebalance_qrl.py` that accepts strategy config + market snapshot, runs guards (rate limit, duplicate, balance), and returns structured plan/results (no raw dicts).
