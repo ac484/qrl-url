@@ -23,6 +23,14 @@ from src.app.infrastructure.exchange.mexc_api_client import MexcApiClient
 from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
 
+@dataclass(frozen=True)
+class SymbolFilters:
+    tick_size: Decimal
+    step_size: Decimal
+    min_qty: Decimal
+    min_notional: Decimal
+
+
 def _to_str(value: Decimal | None) -> str | None:
     return str(value) if value is not None else None
 
@@ -133,6 +141,40 @@ class MexcService:
         base = symbol.value.replace("/", "").upper().removesuffix("USDT")
         tp = TradingPair(base_currency=base, quote_currency="USDT")
         return await self._api_client.get_klines(tp, interval=interval, limit=limit)
+
+    async def get_symbol_filters(self, symbol: Symbol) -> SymbolFilters:
+        info = await self._rest_client.exchange_info(symbol=_symbol_value(symbol))
+        symbols = info.get("symbols") or []
+        if not symbols:
+            return SymbolFilters(
+                tick_size=Decimal("0.0001"),
+                step_size=Decimal("0.000001"),
+                min_qty=Decimal("0"),
+                min_notional=Decimal("1"),
+            )
+
+        filters = symbols[0].get("filters", [])
+        tick_size = Decimal("0.0001")
+        step_size = Decimal("0.000001")
+        min_qty = Decimal("0")
+        min_notional = Decimal("1")
+
+        for f in filters:
+            ftype = f.get("filterType")
+            if ftype == "PRICE_FILTER":
+                tick_size = Decimal(str(f.get("tickSize", tick_size)))
+            elif ftype == "LOT_SIZE":
+                step_size = Decimal(str(f.get("stepSize", step_size)))
+                min_qty = Decimal(str(f.get("minQty", min_qty)))
+            elif ftype == "MIN_NOTIONAL":
+                min_notional = Decimal(str(f.get("minNotional", min_notional)))
+
+        return SymbolFilters(
+            tick_size=tick_size,
+            step_size=step_size,
+            min_qty=min_qty,
+            min_notional=min_notional,
+        )
 
 
 def build_mexc_service(settings: MexcSettings) -> MexcService:

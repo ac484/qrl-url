@@ -6,7 +6,12 @@ from decimal import Decimal, ROUND_DOWN
 from typing import Callable
 from uuid import uuid4
 
-from src.app.application.exchange.mexc_service import MexcService, PlaceOrderRequest, build_mexc_service
+from src.app.application.exchange.mexc_service import (
+    MexcService,
+    PlaceOrderRequest,
+    SymbolFilters,
+    build_mexc_service,
+)
 from src.app.domain.entities.account import Account
 from src.app.domain.value_objects.order_type import OrderType
 from src.app.domain.value_objects.price import Price
@@ -16,10 +21,6 @@ from src.app.domain.value_objects.symbol import Symbol
 from src.app.domain.value_objects.time_in_force import TimeInForce
 from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
-TICK_SIZE = Decimal("0.0001")
-QTY_PRECISION = Decimal("0.000001")
-NOTIONAL_USDT = Decimal("1")
-MIN_ORDER_QUANTITY = Decimal("0")
 ALLOCATION_SYMBOL = Symbol("QRLUSDT")
 
 
@@ -51,8 +52,9 @@ class AllocationUseCase:
             qrl_free, usdt_free = _extract_balances(account)
             side = Side("SELL") if qrl_free > usdt_free else Side("BUY")
             quote = await svc.get_price(ALLOCATION_SYMBOL)
-            limit_price = _select_limit_price(quote, side)
-            quantity = _size_for_notional(limit_price)
+            filters = await svc.get_symbol_filters(ALLOCATION_SYMBOL)
+            limit_price = _select_limit_price(quote, side, filters)
+            quantity = _size_for_notional(limit_price, filters)
             order = await svc.place_order(
                 PlaceOrderRequest(
                     symbol=ALLOCATION_SYMBOL,
@@ -85,31 +87,33 @@ def _extract_balances(account: Account) -> tuple[Decimal, Decimal]:
     return qrl, usdt
 
 
-def _select_limit_price(quote: Price, side: Side) -> Decimal:
+def _select_limit_price(quote: Price, side: Side, filters: SymbolFilters) -> Decimal:
     """Choose a limit price from the top-of-book, falling back to last price when needed."""
     raw = quote.ask if side.value == "BUY" else quote.bid
     candidate = raw if raw > 0 else quote.last
     try:
-        return _normalize_price(candidate)
+        return _normalize_price(candidate, filters.tick_size)
     except ValueError as exc:
         if candidate == quote.last:
             raise ValueError("Allocation cannot proceed without a usable bid/ask/last price") from exc
-        return _normalize_price(quote.last)
+        return _normalize_price(quote.last, filters.tick_size)
 
 
-def _size_for_notional(limit_price: Decimal) -> Quantity:
+def _size_for_notional(limit_price: Decimal, filters: SymbolFilters) -> Quantity:
     """Size the order to approximately 1 USDT notional, rounded down."""
-    qty = (NOTIONAL_USDT / limit_price).quantize(QTY_PRECISION, rounding=ROUND_DOWN)
-    if qty <= MIN_ORDER_QUANTITY:
+    raw_qty = filters.min_notional / limit_price
+    qty = max(raw_qty, filters.min_qty)
+    qty = qty.quantize(filters.step_size, rounding=ROUND_DOWN)
+    if qty <= 0:
         raise ValueError("Computed allocation size is non-positive")
     return Quantity(qty)
 
 
-def _normalize_price(value: Decimal) -> Decimal:
+def _normalize_price(value: Decimal, tick_size: Decimal) -> Decimal:
     """Align price to tick size and ensure it remains usable for order placement."""
     if value <= 0:
         raise ValueError("Allocation cannot proceed without a positive quote")
-    normalized = value.quantize(TICK_SIZE, rounding=ROUND_DOWN)
+    normalized = value.quantize(tick_size, rounding=ROUND_DOWN)
     if normalized <= 0:
         raise ValueError("Allocation cannot proceed without a positive quote")
     return normalized

@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, ROUND_DOWN
 import pytest
 
-from src.app.application.exchange.mexc_service import PlaceOrderRequest
+from src.app.application.exchange.mexc_service import PlaceOrderRequest, SymbolFilters
 from src.app.application.system.use_cases.allocation import AllocationUseCase
 from src.app.domain.entities.account import Account
 from src.app.domain.entities.order import Order
@@ -24,6 +24,12 @@ class FakeService:
         self._usdt_free = Decimal(usdt_free)
         self._price = price
         self.last_order_request: PlaceOrderRequest | None = None
+        self.filters = SymbolFilters(
+            tick_size=Decimal("0.0001"),
+            step_size=Decimal("0.000001"),
+            min_qty=Decimal("0.000001"),
+            min_notional=Decimal("1"),
+        )
 
     async def __aenter__(self):
         return self
@@ -43,6 +49,9 @@ class FakeService:
 
     async def get_price(self, symbol: Symbol) -> Price:  # pragma: no cover - simple passthrough
         return self._price
+
+    async def get_symbol_filters(self, symbol: Symbol) -> SymbolFilters:  # pragma: no cover
+        return self.filters
 
     async def place_order(self, request: PlaceOrderRequest) -> Order:
         self.last_order_request = request

@@ -150,3 +150,7 @@ class MexcRestClient:
         if isinstance(result, list):
             return result
         return []
+
+    async def exchange_info(self, *, symbol: str) -> dict[str, Any]:
+        params = {"symbol": symbol}
+        return await self._request("GET", "/api/v3/exchangeInfo", params=params)
