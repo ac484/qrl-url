@@ -26,12 +26,12 @@ body {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 320px 1fr 340px;
+  grid-template-columns: 360px 1fr 360px;
   grid-template-areas:
-    "depth price orderform"
+    "price kline orderform"
     "depth kline orderform"
-    "depth trades orders"
-    "depth balances orders";
+    "trades trades orders"
+    "balances balances orders";
   gap: 12px;
   align-items: start;
 }
@@ -42,8 +42,8 @@ body {
     grid-template-areas:
       "price"
       "kline"
-      "depth"
       "orderform"
+      "depth"
       "trades"
       "orders"
       "balances";
@@ -178,6 +178,9 @@ canvas {
 
 .orders-card {
   grid-area: orders;
+  max-width: 360px;
+  width: 100%;
+  justify-self: start;
 }
 
 .orders-card .orders-list {
