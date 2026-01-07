@@ -139,6 +139,9 @@ canvas {
 
 .price-card {
   grid-area: price;
+  max-width: 360px;
+  width: 100%;
+  justify-self: start;
 }
 
 .kline-card {
@@ -160,6 +163,9 @@ canvas {
 
 .trades-card {
   grid-area: trades;
+  max-width: 360px;
+  width: 100%;
+  justify-self: start;
 }
 
 .trades-card .trades-list {
@@ -180,6 +186,9 @@ canvas {
 
 .balance-card {
   grid-area: balances;
+  max-width: 360px;
+  width: 100%;
+  justify-self: start;
 }
 
 .order-card {
