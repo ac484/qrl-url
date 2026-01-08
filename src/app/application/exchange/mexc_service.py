@@ -5,6 +5,7 @@ from typing import Iterable
 from src.app.domain.entities.account import Account
 from src.app.domain.entities.order import Order
 from src.app.domain.entities.trade import Trade
+from src.app.domain.value_objects.order_book import OrderBook
 from src.app.domain.value_objects.order_type import OrderType
 from src.app.domain.value_objects.price import Price
 from src.app.domain.value_objects.quantity import Quantity
@@ -14,6 +15,7 @@ from src.app.domain.value_objects.time_in_force import TimeInForce
 from src.app.domain.value_objects.timestamp import Timestamp
 from src.app.infrastructure.exchange.mexc.mappers import (
     account_from_api,
+    order_book_from_api,
     order_from_api,
     server_time_to_timestamp,
     trade_from_api,
@@ -133,6 +135,10 @@ class MexcService:
         base = symbol.value.replace("/", "").upper().removesuffix("USDT")
         tp = TradingPair(base_currency=base, quote_currency="USDT")
         return await self._api_client.get_klines(tp, interval=interval, limit=limit)
+
+    async def get_depth(self, symbol: Symbol, limit: int = 50) -> OrderBook:
+        response = await self._rest_client.depth(symbol=_symbol_value(symbol), limit=limit)
+        return order_book_from_api(response)
 
 
 def build_mexc_service(settings: MexcSettings) -> MexcService:
