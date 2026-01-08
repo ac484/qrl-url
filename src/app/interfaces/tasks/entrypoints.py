@@ -2,8 +2,16 @@
 
 import asyncio
 import os
+from contextlib import asynccontextmanager
 
 from src.app.application.system.use_cases.allocation import AllocationResult, AllocationUseCase
+
+
+class AllocationInProgressError(Exception):
+    """Raised when an allocation run is already in flight."""
+
+
+_allocation_lock = asyncio.Lock()
 
 
 def _allocation_timeout_seconds() -> float:
@@ -15,8 +23,31 @@ def _allocation_timeout_seconds() -> float:
         return 20.0
 
 
+def _allow_parallel_allocation() -> bool:
+    """Return True when parallel allocation runs are explicitly allowed."""
+    return os.getenv("ALLOW_PARALLEL_ALLOCATION", "0") == "1"
+
+
+@asynccontextmanager
+async def _singleflight_allocation():
+    """Guard to prevent overlapping allocation runs on the same instance."""
+    if _allow_parallel_allocation():
+        yield
+        return
+    try:
+        await asyncio.wait_for(_allocation_lock.acquire(), timeout=0)
+    except asyncio.TimeoutError as exc:
+        raise AllocationInProgressError("Allocation is already running") from exc
+    try:
+        yield
+    finally:
+        if _allocation_lock.locked():
+            _allocation_lock.release()
+
+
 async def run_allocation(timeout_seconds: float | None = None) -> AllocationResult:
     """Trigger the allocation use case for Cloud Scheduler with a bounded runtime."""
     usecase = AllocationUseCase()
     timeout = timeout_seconds or _allocation_timeout_seconds()
-    return await asyncio.wait_for(usecase.execute(), timeout=timeout)
+    async with _singleflight_allocation():
+        return await asyncio.wait_for(usecase.execute(), timeout=timeout)

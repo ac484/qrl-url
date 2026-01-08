@@ -67,6 +67,21 @@ def test_allocation_endpoint_returns_504_on_timeout(monkeypatch):
     assert resp.json()["detail"] == "Allocation task exceeded timeout"
 
 
+def test_allocation_endpoint_returns_429_on_parallel_request(monkeypatch):
+    app = create_app()
+    client = TestClient(app)
+
+    async def _busy():
+        raise entrypoints.AllocationInProgressError("Allocation is already running")
+
+    monkeypatch.setattr(entrypoints, "run_allocation", _busy)
+
+    resp = client.get("/tasks/allocation")
+
+    assert resp.status_code == 429
+    assert resp.json()["detail"] == "Allocation is already running"
+
+
 def test_allocation_endpoint_returns_502_on_upstream_error(monkeypatch):
     app = create_app()
     client = TestClient(app)
