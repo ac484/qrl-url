@@ -23,7 +23,7 @@ post_date: 2026-01-08
 
 ## Mitigations shipped
 - Added a single-flight lock in `interfaces/tasks/entrypoints.py`. When a run is already in progress, the handler returns `429 Allocation is already running` instead of stacking work.
-- The lock is controllable via `ALLOW_PARALLEL_ALLOCATION` (default `0`). Enable only if intentional concurrency is required.
+- The lock is controllable via `ALLOW_PARALLEL_ALLOCATION` (default `0`). Enable only if intentional concurrency is required. Lock acquisition timeout is configurable via `ALLOCATION_LOCK_TIMEOUT_SECONDS` (default `0.1`).
 - Task logging now emits `allocation.request.complete` with `elapsed_ms`, `status`, `job_name`, `retry_count`, and `execution_time` to make overlap easy to spot.
 
 ## Operational tuning

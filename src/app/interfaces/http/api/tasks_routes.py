@@ -32,7 +32,7 @@ def _filter_none(data: dict[str, str | None]) -> dict[str, str]:
 async def _trigger_allocation(request: Request | None = None) -> AllocationResponse:
     """Run the allocation task and normalize the response."""
     started = time.perf_counter()
-    metadata = _scheduler_metadata(request.headers if request else None)
+    metadata = _scheduler_metadata(request.headers if request is not None else None)
     status = "error"
     try:
         result = await entrypoints.run_allocation()
