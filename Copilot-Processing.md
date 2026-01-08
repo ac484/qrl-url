@@ -1,3 +1,1 @@
-User Request:
-- Analyze project section /tasks/allocation > proportion analysis > place order.
-- Return all files involved in full /tasks/allocation flow in the RP (report/response).
+User request: Analyze high Cloud Run computation triggered by Cloud Scheduler and propose optimization, update repo accordingly.
