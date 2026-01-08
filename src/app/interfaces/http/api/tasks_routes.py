@@ -36,8 +36,9 @@ async def _trigger_allocation(request: Request | None = None) -> AllocationRespo
     status = "error"
     try:
         result = await entrypoints.run_allocation()
-        status = result.status
-        return AllocationResponse.model_validate(result)
+        response = AllocationResponse.model_validate(result)
+        status = response.status
+        return response
     except entrypoints.AllocationInProgressError as exc:
         raise HTTPException(status_code=429, detail=str(exc))
     except asyncio.TimeoutError:

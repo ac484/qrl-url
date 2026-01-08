@@ -11,16 +11,8 @@ class AllocationInProgressError(Exception):
     """Raised when an allocation run is already in flight."""
 
 
-_allocation_lock = asyncio.Lock()
-
-
-def _lock_timeout_seconds() -> float:
-    """Timeout for attempting to take the allocation lock (seconds)."""
-    raw: str | None = os.getenv("ALLOCATION_LOCK_TIMEOUT_SECONDS", "0.1")
-    try:
-        return float(raw)
-    except ValueError:
-        return 0.1
+_allocation_state_lock = asyncio.Lock()
+_allocation_running = False
 
 
 def _allocation_timeout_seconds() -> float:
@@ -40,19 +32,18 @@ def _allow_parallel_allocation() -> bool:
 @asynccontextmanager
 async def _singleflight_allocation():
     """Guard to prevent overlapping allocation runs on the same instance."""
-    acquired = False
+    global _allocation_running
     if not _allow_parallel_allocation():
-        try:
-            acquired = await asyncio.wait_for(
-                _allocation_lock.acquire(), timeout=_lock_timeout_seconds()
-            )
-        except asyncio.TimeoutError as exc:
-            raise AllocationInProgressError("Allocation is already running") from exc
+        async with _allocation_state_lock:
+            if _allocation_running:
+                raise AllocationInProgressError("Allocation is already running")
+            _allocation_running = True
     try:
         yield
     finally:
-        if acquired:
-            _allocation_lock.release()
+        if not _allow_parallel_allocation():
+            async with _allocation_state_lock:
+                _allocation_running = False
 
 
 async def run_allocation(timeout_seconds: float | None = None) -> AllocationResult:
