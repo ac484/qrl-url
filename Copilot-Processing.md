@@ -1,1 +1,3 @@
-User Request: Investigate production 500 at https://qrl-trading-api-545492969490.asia-southeast1.run.app/tasks/allocation while localhost works. Ensure env vars (MEXC_API_KEY, MEXC_SECRET_KEY) are considered. Repo: ac484/qrl-url, path /home/runner/work/qrl-url/qrl-url.
+User Request:
+- Analyze project section /tasks/allocation > proportion analysis > place order.
+- Return all files involved in full /tasks/allocation flow in the RP (report/response).
