@@ -33,20 +33,24 @@ async def _trigger_allocation(request: Request | None = None) -> AllocationRespo
     """Run the allocation task and normalize the response."""
     started = time.perf_counter()
     metadata = _scheduler_metadata(request.headers if request is not None else None)
-    status = "error"
+    status = "unknown"
     try:
         result = await entrypoints.run_allocation()
         response = AllocationResponse.model_validate(result)
         status = response.status
         return response
     except entrypoints.AllocationInProgressError as exc:
+        status = "busy"
         raise HTTPException(status_code=429, detail=str(exc))
     except asyncio.TimeoutError:
+        status = "timeout"
         raise HTTPException(status_code=504, detail="Allocation task exceeded timeout")
     except (ValidationError, httpx.HTTPError) as exc:
+        status = "upstream_error"
         logger.exception("Allocation failed due to configuration or upstream API error")
         raise HTTPException(status_code=502, detail=str(exc))
     except Exception:
+        status = "error"
         logger.exception("Unexpected allocation failure")
         raise HTTPException(status_code=500, detail="Allocation task failed")
     finally:
