@@ -31,17 +31,16 @@ def _allow_parallel_allocation() -> bool:
 @asynccontextmanager
 async def _singleflight_allocation():
     """Guard to prevent overlapping allocation runs on the same instance."""
-    if _allow_parallel_allocation():
-        yield
-        return
-    try:
-        await asyncio.wait_for(_allocation_lock.acquire(), timeout=0)
-    except asyncio.TimeoutError as exc:
-        raise AllocationInProgressError("Allocation is already running") from exc
+    acquired = False
+    if not _allow_parallel_allocation():
+        if _allocation_lock.locked():
+            raise AllocationInProgressError("Allocation is already running")
+        await _allocation_lock.acquire()
+        acquired = True
     try:
         yield
     finally:
-        if _allocation_lock.locked():
+        if acquired:
             _allocation_lock.release()
 
 

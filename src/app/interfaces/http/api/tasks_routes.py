@@ -15,8 +15,9 @@ api_router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _scheduler_metadata(headers: Mapping[str, str]) -> dict[str, str | None]:
+def _scheduler_metadata(headers: Mapping[str, str] | None) -> dict[str, str | None]:
     """Extract Cloud Scheduler identifiers for observability."""
+    headers = headers or {}
     return {
         "job_name": headers.get("X-CloudScheduler-JobName"),
         "retry_count": headers.get("X-CloudScheduler-JobRetryCount"),
@@ -31,7 +32,7 @@ def _filter_none(data: dict[str, str | None]) -> dict[str, str]:
 async def _trigger_allocation(request: Request | None = None) -> AllocationResponse:
     """Run the allocation task and normalize the response."""
     started = time.perf_counter()
-    metadata = _scheduler_metadata(request.headers if request else {})
+    metadata = _scheduler_metadata(request.headers if request else None)
     status = "error"
     try:
         result = await entrypoints.run_allocation()
