@@ -94,8 +94,10 @@ class AllocationUseCase:
             filled, weighted_price = self._depth_calculator.compute(
                 order_book, comparison.preferred_side, self._target_quantity
             )
+            best_bid = _best_bid(order_book)
+            best_ask = _best_ask(order_book)
             top_price = _best_price(order_book, comparison.preferred_side)
-            if top_price <= 0:
+            if top_price <= 0 or best_bid <= 0 or best_ask <= 0:
                 return _result_from_slippage(
                     request_id, executed_at, SlippageAssessment(Decimal("0"), Decimal("0"), False, "No executable depth")
                 )
@@ -109,13 +111,20 @@ class AllocationUseCase:
             if not slippage.is_acceptable:
                 return _result_from_slippage(request_id, executed_at, slippage)
 
-            dynamic_price = _compute_limit_price(
-                weighted_price=weighted_price,
+            limit_price = _compute_limit_price(
                 side=comparison.preferred_side,
+                best_bid=best_bid,
+                best_ask=best_ask,
                 buffer_pct=AllocationConfig.PRICE_BUFFER_PCT,
             )
+            if limit_price is None:
+                return _result_from_slippage(
+                    request_id,
+                    executed_at,
+                    SlippageAssessment(Decimal("0"), Decimal("0"), False, "Cannot place maker limit"),
+                )
             command = _build_order_command(
-                side=comparison.preferred_side, quantity=self._target_quantity, limit_price=dynamic_price
+                side=comparison.preferred_side, quantity=self._target_quantity, limit_price=limit_price
             )
             order = await svc.place_order(
                 PlaceOrderRequest(
@@ -167,11 +176,29 @@ def _best_price(book: OrderBook, side: Side) -> Decimal:
     return min(prices) if side.value == "BUY" else max(prices)
 
 
-def _compute_limit_price(*, weighted_price: Decimal, side: Side, buffer_pct: Decimal) -> Decimal:
-    if weighted_price <= 0:
-        raise ValueError("Weighted price must be positive for limit calculation")
-    multiplier = Decimal("1") + buffer_pct if side.value == "BUY" else Decimal("1") - buffer_pct
-    return weighted_price * multiplier
+def _best_bid(book: OrderBook) -> Decimal:
+    bids = [level.price for level in book.bids]
+    return max(bids) if bids else Decimal("0")
+
+
+def _best_ask(book: OrderBook) -> Decimal:
+    asks = [level.price for level in book.asks]
+    return min(asks) if asks else Decimal("0")
+
+
+def _compute_limit_price(*, side: Side, best_bid: Decimal, best_ask: Decimal, buffer_pct: Decimal) -> Decimal | None:
+    """Return a maker-style limit price that does not cross the spread."""
+    if best_bid <= 0 or best_ask <= 0 or best_bid >= best_ask:
+        return None
+    if side.value == "BUY":
+        candidate = best_bid * (Decimal("1") - buffer_pct)
+        if candidate >= best_ask:
+            return None
+        return candidate
+    candidate = best_ask * (Decimal("1") + buffer_pct)
+    if candidate <= best_bid:
+        return None
+    return candidate
 
 
 def _result_from_skip(

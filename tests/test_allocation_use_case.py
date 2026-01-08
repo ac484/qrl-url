@@ -118,6 +118,7 @@ async def test_allocation_places_order_when_slippage_ok():
         qrl_free="2",
         usdt_free="1",
         bids=[DepthLevel(price=Decimal("1.01"), quantity=Decimal("1.5"))],
+        asks=[DepthLevel(price=Decimal("1.02"), quantity=Decimal("1.0"))],
     )
     usecase = AllocationUseCase(service_factory=lambda: service)
 
@@ -130,7 +131,7 @@ async def test_allocation_places_order_when_slippage_ok():
     assert service.last_order_request is not None
     assert service.last_order_request.side.value == "SELL"
     assert service.last_order_request.price is not None
-    assert service.last_order_request.price.last == Decimal("1.00899")
+    assert service.last_order_request.price.last == Decimal("1.02102")
     assert service.last_order_request.quantity.value == Decimal("1")
     assert service.last_order_request.time_in_force == TimeInForce("GTC")
 
