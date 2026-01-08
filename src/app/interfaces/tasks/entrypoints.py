@@ -12,6 +12,7 @@ class AllocationInProgressError(Exception):
 
 
 _allocation_lock = asyncio.Lock()
+_LOCK_ACQUIRE_TIMEOUT = 0.1
 
 
 def _allocation_timeout_seconds() -> float:
@@ -35,7 +36,9 @@ async def _singleflight_allocation():
         yield
         return
     try:
-        await asyncio.wait_for(_allocation_lock.acquire(), timeout=0)
+        await asyncio.wait_for(
+            _allocation_lock.acquire(), timeout=_LOCK_ACQUIRE_TIMEOUT
+        )
     except asyncio.TimeoutError as exc:
         raise AllocationInProgressError("Allocation is already running") from exc
     try:

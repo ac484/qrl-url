@@ -6,6 +6,7 @@ from typing import Mapping
 from fastapi import APIRouter, HTTPException, Request
 import httpx
 from pydantic import ValidationError
+from starlette.datastructures import Headers
 
 from src.app.interfaces.http.schemas import AllocationResponse
 from src.app.interfaces.tasks import entrypoints
@@ -15,7 +16,7 @@ api_router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _scheduler_metadata(headers: Mapping[str, str] | None) -> dict[str, str | None]:
+def _scheduler_metadata(headers: Mapping[str, str] | Headers | None) -> dict[str, str | None]:
     """Extract Cloud Scheduler identifiers for observability."""
     headers = headers or {}
     return {
@@ -32,7 +33,7 @@ def _filter_none(data: dict[str, str | None]) -> dict[str, str]:
 async def _trigger_allocation(request: Request | None = None) -> AllocationResponse:
     """Run the allocation task and normalize the response."""
     started = time.perf_counter()
-    metadata = _scheduler_metadata(request.headers if request is not None else None)
+    metadata = _scheduler_metadata(getattr(request, "headers", None))
     status = "unknown"
     try:
         result = await entrypoints.run_allocation()
