@@ -15,8 +15,38 @@ def _allocation_timeout_seconds() -> float:
         return 20.0
 
 
-async def run_allocation(timeout_seconds: float | None = None) -> AllocationResult:
-    """Trigger the allocation use case for Cloud Scheduler with a bounded runtime."""
+_allocation_singleflight_lock = asyncio.Lock()
+_inflight_allocation: asyncio.Task[AllocationResult] | None = None
+
+
+def _clear_inflight(task: asyncio.Task[AllocationResult]) -> None:
+    """Clear the cached task when it completes."""
+    global _inflight_allocation
+    if task is _inflight_allocation and task.done():
+        _inflight_allocation = None
+
+
+async def _run_allocation_once(timeout_seconds: float) -> AllocationResult:
+    """Execute the allocation use case once with timeout enforcement."""
     usecase = AllocationUseCase()
+    return await asyncio.wait_for(usecase.execute(), timeout=timeout_seconds)
+
+
+async def run_allocation(timeout_seconds: float | None = None) -> AllocationResult:
+    """Trigger allocation with a single-flight guard to avoid duplicate runs."""
+    global _inflight_allocation
     timeout = timeout_seconds or _allocation_timeout_seconds()
-    return await asyncio.wait_for(usecase.execute(), timeout=timeout)
+
+    async with _allocation_singleflight_lock:
+        if _inflight_allocation is None or _inflight_allocation.done():
+            _inflight_allocation = asyncio.create_task(_run_allocation_once(timeout))
+            _inflight_allocation.add_done_callback(_clear_inflight)
+        task = _inflight_allocation
+
+    return await asyncio.wait_for(asyncio.shield(task), timeout=timeout)
+
+
+def _reset_allocation_singleflight() -> None:
+    """Reset cached allocation state (primarily for tests)."""
+    global _inflight_allocation
+    _inflight_allocation = None
