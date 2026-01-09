@@ -1,3 +1,1 @@
-User Request:
-- Analyze project section /tasks/allocation > proportion analysis > place order.
-- Return all files involved in full /tasks/allocation flow in the RP (report/response).
+User request: Address overlapping Cloud Scheduler-triggered Cloud Run calls causing repeated TLS/HMAC computation and CPU spikes. Must first audit architecture and flow, then provide root cause analysis and at least two optimization options (application/infrastructure/platform) without changing API contract, frequency, or adding deps. No code implementation until analysis delivered. Need to recommend a preferred solution and explain others.
