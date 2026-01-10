@@ -47,8 +47,6 @@ src/app/application/__init__.py
 src/app/application/account/__init__.py
 src/app/application/account/use_cases/__init__.py
 src/app/application/account/use_cases/get_balance.py
-src/app/application/events/__init__.py
-src/app/application/events/event_bus.py
 src/app/application/exchange/mexc_service.py
 src/app/application/market/__init__.py
 src/app/application/market/mappers/__init__.py
@@ -106,10 +104,8 @@ src/app/domain/entities/trade.py
 src/app/domain/entities/trading_pair.py
 src/app/domain/events/__init__.py
 src/app/domain/events/balance_event.py
-src/app/domain/events/kline_updated_event.py
 src/app/domain/events/market_depth_event.py
 src/app/domain/events/order_event.py
-src/app/domain/events/price_updated_event.py
 src/app/domain/events/trade_event.py
 src/app/domain/factories/aggregates.py
 src/app/domain/services/__init__.py
@@ -147,8 +143,6 @@ src/app/domain/value_objects/timestamp.py
 src/app/domain/value_objects/trade_id.py
 src/app/infrastructure/__init__.py
 src/app/infrastructure/config.py
-src/app/infrastructure/event_bus/__init__.py
-src/app/infrastructure/event_bus/in_memory_event_bus.py
 src/app/infrastructure/exchange/__init__.py
 src/app/infrastructure/exchange/mexc_api_client.py
 src/app/infrastructure/exchange/mexc/__init__.py
@@ -179,25 +173,14 @@ src/app/infrastructure/exchange/mexc/generated/PushDataV3ApiWrapper_pb2.py
 src/app/infrastructure/exchange/mexc/mappers.py
 src/app/infrastructure/exchange/mexc/proto/__init__.py
 src/app/infrastructure/exchange/mexc/qrl/__init__.py
-src/app/infrastructure/exchange/mexc/qrl/qrl_order_mapper.py
-src/app/infrastructure/exchange/mexc/qrl/qrl_price_mapper.py
 src/app/infrastructure/exchange/mexc/qrl/qrl_rest_client.py
 src/app/infrastructure/exchange/mexc/qrl/qrl_settings.py
-src/app/infrastructure/exchange/mexc/qrl/qrl_trade_mapper.py
-src/app/infrastructure/exchange/mexc/qrl/qrl_ws_client.py
-src/app/infrastructure/exchange/mexc/qrl/ws/__init__.py
-src/app/infrastructure/exchange/mexc/qrl/ws/qrl_reconnect_policy.py
-src/app/infrastructure/exchange/mexc/qrl/ws/qrl_snapshot_loader.py
-src/app/infrastructure/exchange/mexc/qrl/ws/qrl_stream_state.py
 src/app/infrastructure/exchange/mexc/rest_client.py
 src/app/infrastructure/exchange/mexc/settings.py
 src/app/infrastructure/exchange/mexc/ws_client.py
 src/app/infrastructure/exchange/mexc/ws/__init__.py
 src/app/infrastructure/exchange/mexc/ws/mexc_ws_client.py
 src/app/infrastructure/external/mexc/__init__.py
-src/app/infrastructure/streaming/__init__.py
-src/app/infrastructure/streaming/bounded_queue.py
-src/app/infrastructure/streaming/ring_buffer.py
 src/app/interfaces/__init__.py
 src/app/interfaces/http/__init__.py
 src/app/interfaces/http/api/__init__.py
@@ -259,26 +242,6 @@ This section contains the contents of the repository's files.
 
 <file path="src/app/application/account/use_cases/__init__.py">
 # Account use cases.
-</file>
-
-<file path="src/app/application/events/__init__.py">
-from .event_bus import EventBus, DomainEvent, EventHandler
-
-__all__ = ["EventBus", "DomainEvent", "EventHandler"]
-</file>
-
-<file path="src/app/application/events/event_bus.py">
-from typing import Any, Awaitable, Callable, Protocol, Type
-
-DomainEvent = Any
-EventHandler = Callable[[DomainEvent], Awaitable[None]]
-
-
-class EventBus(Protocol):
-    async def publish(self, event: DomainEvent) -> None: ...
-
-    def subscribe(self, event_type: Type[DomainEvent], handler: EventHandler) -> None:
-        ...
 </file>
 
 <file path="src/app/application/market/__init__.py">
@@ -940,24 +903,6 @@ class TradingPair:
         return f"{self.base_currency}{self.quote_currency}".upper()
 </file>
 
-<file path="src/app/domain/events/__init__.py">
-from .balance_event import BalanceEvent
-from .kline_updated_event import KLineUpdatedEvent
-from .market_depth_event import MarketDepthEvent
-from .order_event import OrderEvent
-from .price_updated_event import PriceUpdatedEvent
-from .trade_event import TradeEvent
-
-__all__ = [
-    "BalanceEvent",
-    "KLineUpdatedEvent",
-    "MarketDepthEvent",
-    "OrderEvent",
-    "PriceUpdatedEvent",
-    "TradeEvent",
-]
-</file>
-
 <file path="src/app/domain/events/balance_event.py">
 from dataclasses import dataclass
 from decimal import Decimal
@@ -971,20 +916,6 @@ class BalanceEvent:
     free: Decimal
     locked: Decimal
     timestamp: int
-</file>
-
-<file path="src/app/domain/events/kline_updated_event.py">
-from dataclasses import dataclass
-from typing import Iterable
-
-from src.app.domain.entities.trading_pair import TradingPair
-from src.app.domain.value_objects.kline import KLine
-
-
-@dataclass(frozen=True)
-class KLineUpdatedEvent:
-    trading_pair: TradingPair
-    klines: Iterable[KLine]
 </file>
 
 <file path="src/app/domain/events/market_depth_event.py">
@@ -1034,18 +965,6 @@ class OrderEvent:
     quantity: Quantity
     status: OrderStatus
     timestamp: int
-</file>
-
-<file path="src/app/domain/events/price_updated_event.py">
-from dataclasses import dataclass
-from src.app.domain.entities.trading_pair import TradingPair
-from src.app.domain.value_objects.price import Price
-
-
-@dataclass(frozen=True)
-class PriceUpdatedEvent:
-    trading_pair: TradingPair
-    price: Price
 </file>
 
 <file path="src/app/domain/events/trade_event.py">
@@ -1537,37 +1456,6 @@ class Config:
 
 
 config = Config()
-</file>
-
-<file path="src/app/infrastructure/event_bus/__init__.py">
-from .in_memory_event_bus import InMemoryEventBus
-
-__all__ = ["InMemoryEventBus"]
-</file>
-
-<file path="src/app/infrastructure/event_bus/in_memory_event_bus.py">
-from collections import defaultdict
-from typing import Dict, List, Type
-
-from app.application.events.event_bus import DomainEvent, EventBus, EventHandler
-
-
-class InMemoryEventBus(EventBus):
-    """
-    Minimal in-memory event bus for wiring domain events to handlers.
-
-    Infrastructure concern; replaceable with Redis/Kafka later.
-    """
-
-    def __init__(self):
-        self._handlers: Dict[Type, List[EventHandler]] = defaultdict(list)
-
-    def subscribe(self, event_type: Type, handler: EventHandler) -> None:
-        self._handlers[event_type].append(handler)
-
-    async def publish(self, event: DomainEvent) -> None:
-        for handler in self._handlers.get(type(event), []):
-            await handler(event)
 </file>
 
 <file path="src/app/infrastructure/exchange/__init__.py">
@@ -2479,38 +2367,6 @@ if not _descriptor._USE_C_DESCRIPTORS:
 # QRL/USDT dedicated infrastructure components
 </file>
 
-<file path="src/app/infrastructure/exchange/mexc/qrl/qrl_order_mapper.py">
-from src.app.domain.value_objects.qrl_price import QrlPrice
-from src.app.domain.value_objects.qrl_quantity import QrlQuantity
-
-
-def map_rest_order(payload: dict) -> dict:
-    """Return normalized order fields; caller can wrap to domain entity later."""
-    return {
-        "id": payload.get("orderId"),
-        "client_order_id": payload.get("clientOrderId") or payload.get("origClientOrderId"),
-        "price": QrlPrice(payload["price"]) if payload.get("price") else None,
-        "quantity": QrlQuantity(payload["origQty"]) if payload.get("origQty") else None,
-        "executed_quantity": QrlQuantity(payload["executedQty"]) if payload.get("executedQty") else None,
-        "status": payload.get("status"),
-        "side": payload.get("side"),
-        "type": payload.get("type"),
-    }
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/qrl/qrl_price_mapper.py">
-from decimal import Decimal
-
-from src.app.domain.value_objects.qrl_price import QrlPrice
-
-
-def map_ticker_to_price(payload: dict) -> QrlPrice:
-    price = payload.get("lastPrice") or payload.get("last")
-    if price is None:
-        raise ValueError("Missing QRL price in payload")
-    return QrlPrice(Decimal(str(price)))
-</file>
-
 <file path="src/app/infrastructure/exchange/mexc/qrl/qrl_settings.py">
 from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
@@ -2521,95 +2377,6 @@ class QrlSettings(MexcSettings):
     @property
     def symbol(self) -> str:
         return "QRLUSDT"
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/qrl/qrl_trade_mapper.py">
-from decimal import Decimal
-
-from src.app.domain.value_objects.qrl_price import QrlPrice
-from src.app.domain.value_objects.qrl_quantity import QrlQuantity
-
-
-def map_trade(payload: dict) -> dict:
-    return {
-        "id": payload.get("id"),
-        "price": QrlPrice(payload["price"]) if payload.get("price") else None,
-        "quantity": QrlQuantity(payload["qty"]) if payload.get("qty") else None,
-        "quote_qty": Decimal(str(payload["quoteQty"])) if payload.get("quoteQty") else None,
-        "side": payload.get("isBuyer") and "BUY" or "SELL",
-        "time": payload.get("time"),
-    }
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/qrl/qrl_ws_client.py">
-from src.app.infrastructure.exchange.mexc.ws.mexc_ws_client import MexcWsClient
-from src.app.domain.value_objects.qrl_usdt_pair import QrlUsdtPair
-
-
-class QrlWsClient(MexcWsClient):
-    """QRL/USDT專用 WS client，封裝訂閱 symbol。"""
-
-    def __init__(self, base_ws_url: str):
-        super().__init__(base_ws_url)
-
-    async def subscribe_depth(self) -> None:
-        await self.subscribe({"op": "sub.limit.depth", "symbol": QrlUsdtPair.symbol()})
-
-    async def subscribe_trades(self) -> None:
-        await self.subscribe({"op": "sub.personal.deals.v3", "symbol": QrlUsdtPair.symbol()})
-
-    async def subscribe_orders(self) -> None:
-        await self.subscribe({"op": "sub.personal.order.v3", "symbol": QrlUsdtPair.symbol()})
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/qrl/ws/__init__.py">
-# QRL/USDT WebSocket state helpers
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/qrl/ws/qrl_reconnect_policy.py">
-class QrlReconnectPolicy:
-    """Simple reconnect/backoff helper for QRL WS."""
-
-    def __init__(self, max_retries: int = 5, base_delay: float = 1.0):
-        self._max_retries = max_retries
-        self._base_delay = base_delay
-
-    def should_retry(self, attempt: int) -> bool:
-        return attempt < self._max_retries
-
-    def delay_seconds(self, attempt: int) -> float:
-        return self._base_delay * max(1, attempt)
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/qrl/ws/qrl_snapshot_loader.py">
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.ws.qrl_stream_state import QrlStreamState
-
-
-class QrlSnapshotLoader:
-    def __init__(self, rest_client: QrlRestClient):
-        self._rest_client = rest_client
-
-    async def load(self, state: QrlStreamState, limit: int = 50) -> dict:
-        async with self._rest_client as client:
-            snapshot = await client.depth(limit=limit)
-        state.last_update_id = snapshot.get("lastUpdateId")
-        return snapshot
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/qrl/ws/qrl_stream_state.py">
-from dataclasses import dataclass, field
-from typing import Any
-
-
-@dataclass(slots=True)
-class QrlStreamState:
-    last_update_id: int | None = None
-    backlog: list[dict[str, Any]] = field(default_factory=list)
-
-    def apply_update(self, update_id: int) -> None:
-        if self.last_update_id is None or update_id > self.last_update_id:
-            self.last_update_id = update_id
 </file>
 
 <file path="src/app/infrastructure/exchange/mexc/ws_client.py">
@@ -2659,53 +2426,6 @@ class MexcWebSocketClient:
 
 <file path="src/app/infrastructure/external/mexc/__init__.py">
 """MEXC external client placeholders."""
-</file>
-
-<file path="src/app/infrastructure/streaming/__init__.py">
-from .bounded_queue import BoundedAsyncQueue
-from .ring_buffer import RingBuffer
-
-__all__ = ["BoundedAsyncQueue", "RingBuffer"]
-</file>
-
-<file path="src/app/infrastructure/streaming/bounded_queue.py">
-import asyncio
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-
-class BoundedAsyncQueue(Generic[T]):
-    """Async queue with backpressure for WS message ingestion."""
-
-    def __init__(self, max_size: int = 1000):
-        self._queue: asyncio.Queue[T] = asyncio.Queue(maxsize=max_size)
-
-    async def push(self, item: T) -> None:
-        await self._queue.put(item)
-
-    async def pull(self) -> T:
-        return await self._queue.get()
-</file>
-
-<file path="src/app/infrastructure/streaming/ring_buffer.py">
-from collections import deque
-from typing import Deque, Generic, Iterable, TypeVar
-
-T = TypeVar("T")
-
-
-class RingBuffer(Generic[T]):
-    """Fixed-size buffer for lightweight replay/debug."""
-
-    def __init__(self, size: int = 1000):
-        self._buffer: Deque[T] = deque(maxlen=size)
-
-    def append(self, item: T) -> None:
-        self._buffer.append(item)
-
-    def replay(self) -> Iterable[T]:
-        return list(self._buffer)
 </file>
 
 <file path="src/app/interfaces/__init__.py">
@@ -3476,6 +3196,20 @@ class Trade:
     fee: Decimal | None
     fee_asset: str | None
     timestamp: Timestamp
+</file>
+
+<file path="src/app/domain/events/__init__.py">
+from .balance_event import BalanceEvent
+from .market_depth_event import MarketDepthEvent
+from .order_event import OrderEvent
+from .trade_event import TradeEvent
+
+__all__ = [
+    "BalanceEvent",
+    "MarketDepthEvent",
+    "OrderEvent",
+    "TradeEvent",
+]
 </file>
 
 <file path="src/app/domain/factories/aggregates.py">
