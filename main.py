@@ -26,9 +26,7 @@ if SRC.exists() and str(SRC) not in sys.path:
 from src.app.interfaces.http.api import account_routes, market_routes, system_routes, tasks_routes, trading_routes, ws_routes
 from src.app.interfaces.http.api import qrl_routes, trading_api
 from src.app.interfaces.http.pages import dashboard_routes
-from src.app.application.exchange.mexc_service import MexcService
-from src.app.infrastructure.exchange.mexc.rest_client import MexcRestClient
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
+from src.app.interfaces.http.dependencies import build_exchange_factory
 
 load_dotenv()
 
@@ -69,15 +67,13 @@ app = create_app()
 
 async def _demo_mexc_usage() -> None:
     """Demonstrate how to initialize the MexcService and call a simple API."""
+    factory = build_exchange_factory()
     try:
-        settings = MexcSettings()
+        async with factory() as service:
+            server_time = await service.get_server_time()
+            print(f"[demo] MEXC server time: {server_time.value.isoformat()}")
     except Exception as exc:  # pragma: no cover - demonstration only
         print(f"[demo] Unable to load MEXC credentials: {exc}")
-        return
-
-    async with MexcService(MexcRestClient(settings)) as service:
-        server_time = await service.get_server_time()
-        print(f"[demo] MEXC server time: {server_time.value.isoformat()}")
 
 
 def _should_run_demo() -> bool:

@@ -1,14 +1,16 @@
-from src.app.domain.value_objects.qrl_usdt_pair import QrlUsdtPair
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.application.market.use_cases.get_depth import _serialize_depth
+from src.app.domain.value_objects.symbol import Symbol
 
 
 class GetQrlDepth:
     """Fetch QRL/USDT order book snapshot."""
 
-    def __init__(self, rest_client: QrlRestClient, limit: int = 50):
-        self._client = rest_client
+    def __init__(self, exchange_factory: ExchangeServiceFactory, limit: int = 50):
+        self._exchange_factory = exchange_factory
         self._limit = limit
 
     async def execute(self) -> dict:
-        async with self._client as client:
-            return await client.depth(limit=self._limit)
+        async with self._exchange_factory() as exchange:
+            book = await exchange.get_depth(Symbol("QRLUSDT"), limit=self._limit)
+        return _serialize_depth(book)

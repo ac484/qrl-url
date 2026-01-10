@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from typing import List
 
-from src.app.application.exchange.mexc_service import MexcService, build_mexc_service
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
 from src.app.domain.value_objects.kline import KLine
 from src.app.domain.value_objects.symbol import Symbol
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
 
 def _serialize_kline(k: KLine) -> dict:
@@ -21,10 +20,9 @@ def _serialize_kline(k: KLine) -> dict:
 
 @dataclass
 class GetKlineUseCase:
-    settings: MexcSettings | None = None
+    exchange_factory: ExchangeServiceFactory
 
     async def execute(self, symbol: str, interval: str, limit: int = 100) -> List[dict]:
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            klines = await svc.get_kline(Symbol(symbol), interval=interval, limit=limit)
+        async with self.exchange_factory() as exchange:
+            klines = await exchange.get_kline(Symbol(symbol), interval=interval, limit=limit)
         return [_serialize_kline(k) for k in klines]

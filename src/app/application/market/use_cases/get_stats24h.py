@@ -4,8 +4,8 @@ Market use case: 24h stats for QRL/USDT.
 
 from dataclasses import dataclass
 
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.domain.value_objects.symbol import Symbol
 
 
 @dataclass
@@ -16,10 +16,9 @@ class GetStats24hInput:
 class GetStats24hUseCase:
     """Fetch 24h statistics for the fixed QRL/USDT symbol."""
 
-    def __init__(self, settings: QrlSettings | None = None):
-        self._settings = settings or QrlSettings()
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
 
     async def execute(self, data: GetStats24hInput | None = None) -> dict:
-        client = QrlRestClient(self._settings)
-        async with client as cli:
-            return await cli.ticker_24h()
+        async with self._exchange_factory() as exchange:
+            return await exchange.get_ticker_24h(Symbol("QRLUSDT"))

@@ -1,10 +1,9 @@
 """Trading use case: list trades for QRL/USDT."""
 
-from src.app.application.exchange.mexc_service import MexcService, build_mexc_service
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
 from src.app.application.trading.dtos import TradeDTO
 from src.app.domain.entities.trade import Trade
 from src.app.domain.value_objects.symbol import Symbol
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
 
 def _serialize_trade(trade: Trade) -> dict:
@@ -23,13 +22,10 @@ def _serialize_trade(trade: Trade) -> dict:
 
 
 class ListTradesUseCase:
-    settings: MexcSettings | None = None
-
-    def __init__(self, settings: MexcSettings | None = None):
-        self.settings = settings
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
 
     async def execute(self, symbol: str) -> list[dict]:
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            trades = await svc.list_trades(Symbol(symbol))
+        async with self._exchange_factory() as exchange:
+            trades = await exchange.list_trades(Symbol(symbol))
         return [_serialize_trade(trade) for trade in trades]

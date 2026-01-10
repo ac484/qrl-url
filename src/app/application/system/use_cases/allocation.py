@@ -3,10 +3,12 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Callable
 from uuid import uuid4
 
-from src.app.application.exchange.mexc_service import MexcService, PlaceOrderRequest, build_mexc_service
+from src.app.application.ports.exchange_service import (
+    ExchangeServiceFactory,
+    PlaceOrderRequest,
+)
 from src.app.domain.entities.account import Account
 from src.app.domain.services.balance_comparison_rule import BalanceComparisonRule
 from src.app.domain.services.depth_calculator import DepthCalculator
@@ -23,7 +25,6 @@ from src.app.domain.value_objects.side import Side
 from src.app.domain.value_objects.slippage import SlippageAssessment
 from src.app.domain.value_objects.symbol import Symbol
 from src.app.domain.value_objects.time_in_force import TimeInForce
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
 
 class AllocationConfig:
@@ -57,14 +58,14 @@ class AllocationUseCase:
 
     def __init__(
         self,
-        service_factory: Callable[[], MexcService] | None = None,
+        exchange_factory: ExchangeServiceFactory,
         *,
         depth_limit: int = AllocationConfig.DEPTH_LIMIT,
         slippage_threshold_pct: Decimal = AllocationConfig.SLIPPAGE_THRESHOLD_PCT,
         target_quantity: Quantity | None = None,
         limit_price: Decimal = AllocationConfig.LIMIT_PRICE,
     ):
-        self._service_factory = service_factory or (lambda: build_mexc_service(MexcSettings()))
+        self._exchange_factory = exchange_factory
         self._comparison_rule = BalanceComparisonRule()
         self._depth_calculator = DepthCalculator()
         self._slippage_analyzer = SlippageAnalyzer(slippage_threshold_pct)
@@ -77,7 +78,7 @@ class AllocationUseCase:
         """Compare balances, evaluate depth/slippage, and submit a balancing order."""
         request_id = str(uuid4())
         executed_at = datetime.now(timezone.utc)
-        async with self._service_factory() as svc:
+        async with self._exchange_factory() as svc:
             account = await svc.get_account()
             try:
                 quote = await svc.get_price(AllocationConfig.SYMBOL)

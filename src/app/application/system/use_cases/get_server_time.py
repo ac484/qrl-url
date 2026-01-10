@@ -3,6 +3,8 @@ System use case: get server time.
 """
 
 from dataclasses import dataclass
+
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
 from src.app.domain.value_objects.timestamp import Timestamp
 
 
@@ -12,6 +14,10 @@ class GetServerTimeOutput:
 
 
 class GetServerTimeUseCase:
-    def execute(self) -> GetServerTimeOutput:
-        # TODO: retrieve via port
-        return GetServerTimeOutput()
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self) -> GetServerTimeOutput:
+        async with self._exchange_factory() as exchange:
+            server_time = await exchange.get_server_time()
+        return GetServerTimeOutput(server_time=server_time)

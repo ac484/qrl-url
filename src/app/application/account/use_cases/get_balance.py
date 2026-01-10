@@ -3,12 +3,11 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-from src.app.application.exchange.mexc_service import MexcService, build_mexc_service
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
 from src.app.domain.entities.account import Account
 from src.app.domain.services.valuation_service import ValuationService
 from src.app.domain.value_objects.price import Price
 from src.app.domain.value_objects.symbol import Symbol
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
 
 def _mid(price: Price) -> Decimal:
@@ -96,14 +95,13 @@ def _serialize_account(account: Account, valuation: dict) -> dict:
 
 @dataclass
 class GetBalanceUseCase:
-    settings: MexcSettings | None = None
+    exchange_factory: ExchangeServiceFactory
 
     async def execute(self) -> dict:
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            account = await svc.get_account()
+        async with self.exchange_factory() as exchange:
+            account = await exchange.get_account()
             try:
-                price = await svc.get_price(Symbol("QRLUSDT"))
+                price = await exchange.get_price(Symbol("QRLUSDT"))
                 mid = _mid(price)
             except Exception:
                 price = None

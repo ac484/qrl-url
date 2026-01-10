@@ -47,7 +47,6 @@ src/app/application/__init__.py
 src/app/application/account/__init__.py
 src/app/application/account/use_cases/__init__.py
 src/app/application/account/use_cases/get_balance.py
-src/app/application/exchange/mexc_service.py
 src/app/application/market/__init__.py
 src/app/application/market/mappers/__init__.py
 src/app/application/market/mappers/mexc.py
@@ -63,6 +62,7 @@ src/app/application/market/use_cases/get_stats24h.py
 src/app/application/market/use_cases/get_ticker.py
 src/app/application/ports/__init__.py
 src/app/application/ports/exchange_gateway.py
+src/app/application/ports/exchange_service.py
 src/app/application/system/__init__.py
 src/app/application/system/use_cases/__init__.py
 src/app/application/system/use_cases/allocation.py
@@ -177,6 +177,7 @@ src/app/infrastructure/exchange/mexc/qrl/__init__.py
 src/app/infrastructure/exchange/mexc/qrl/qrl_rest_client.py
 src/app/infrastructure/exchange/mexc/qrl/qrl_settings.py
 src/app/infrastructure/exchange/mexc/rest_client.py
+src/app/infrastructure/exchange/mexc/service.py
 src/app/infrastructure/exchange/mexc/settings.py
 src/app/infrastructure/exchange/mexc/ws_client.py
 src/app/infrastructure/exchange/mexc/ws/__init__.py
@@ -274,187 +275,8 @@ def map_ws_ticker_event_to_domain(event: dict) -> Ticker:
 # QRL market application use cases package
 </file>
 
-<file path="src/app/application/market/qrl/get_qrl_depth.py">
-from src.app.domain.value_objects.qrl_usdt_pair import QrlUsdtPair
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-
-
-class GetQrlDepth:
-    """Fetch QRL/USDT order book snapshot."""
-
-    def __init__(self, rest_client: QrlRestClient, limit: int = 50):
-        self._client = rest_client
-        self._limit = limit
-
-    async def execute(self) -> dict:
-        async with self._client as client:
-            return await client.depth(limit=self._limit)
-</file>
-
-<file path="src/app/application/market/qrl/get_qrl_kline.py">
-from src.app.domain.value_objects.qrl_usdt_pair import QrlUsdtPair
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-
-
-class GetQrlKline:
-    """Fetch QRL/USDT kline data."""
-
-    def __init__(self, rest_client: QrlRestClient, interval: str = "1m", limit: int = 100):
-        self._client = rest_client
-        self._interval = interval
-        self._limit = limit
-
-    async def execute(self) -> list:
-        async with self._client as client:
-            return await client.klines(interval=self._interval, limit=self._limit)
-</file>
-
 <file path="src/app/application/market/use_cases/__init__.py">
 # Market use cases.
-</file>
-
-<file path="src/app/application/market/use_cases/get_depth.py">
-"""
-Market use case: get order book depth for QRL/USDT.
-"""
-
-from dataclasses import dataclass
-
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
-
-
-@dataclass
-class GetDepthInput:
-    limit: int = 50
-
-
-class GetDepthUseCase:
-    """Fetch aggregated depth for the fixed QRL/USDT symbol."""
-
-    def __init__(self, settings: QrlSettings | None = None):
-        self._settings = settings or QrlSettings()
-
-    async def execute(self, data: GetDepthInput | None = None) -> dict:
-        payload = data or GetDepthInput()
-        client = QrlRestClient(self._settings)
-        async with client as cli:
-            return await cli.depth(limit=payload.limit)
-</file>
-
-<file path="src/app/application/market/use_cases/get_kline.py">
-"""
-Market use case: get kline data for QRL/USDT.
-"""
-
-from dataclasses import dataclass
-
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
-
-
-@dataclass
-class GetKlineInput:
-    interval: str = "1m"
-    limit: int = 50
-
-
-class GetKlineUseCase:
-    """Fetch klines for the fixed QRL/USDT symbol."""
-
-    def __init__(self, settings: QrlSettings | None = None):
-        self._settings = settings or QrlSettings()
-
-    async def execute(self, data: GetKlineInput | None = None) -> list:
-        payload = data or GetKlineInput()
-        client = QrlRestClient(self._settings)
-        async with client as cli:
-            return await cli.klines(interval=payload.interval, limit=payload.limit)
-</file>
-
-<file path="src/app/application/market/use_cases/get_market_trades.py">
-"""
-Market use case: recent public trades for QRL/USDT.
-"""
-
-from dataclasses import dataclass
-
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
-
-
-@dataclass
-class GetMarketTradesInput:
-    limit: int = 50
-
-
-class GetMarketTradesUseCase:
-    """Fetch recent public trades for the fixed QRL/USDT symbol."""
-
-    def __init__(self, settings: QrlSettings | None = None):
-        self._settings = settings or QrlSettings()
-
-    async def execute(self, data: GetMarketTradesInput | None = None) -> list:
-        payload = data or GetMarketTradesInput()
-        client = QrlRestClient(self._settings)
-        async with client as cli:
-            return await cli.market_trades(limit=payload.limit)
-</file>
-
-<file path="src/app/application/market/use_cases/get_stats24h.py">
-"""
-Market use case: 24h stats for QRL/USDT.
-"""
-
-from dataclasses import dataclass
-
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
-
-
-@dataclass
-class GetStats24hInput:
-    include_timestamp: bool = True
-
-
-class GetStats24hUseCase:
-    """Fetch 24h statistics for the fixed QRL/USDT symbol."""
-
-    def __init__(self, settings: QrlSettings | None = None):
-        self._settings = settings or QrlSettings()
-
-    async def execute(self, data: GetStats24hInput | None = None) -> dict:
-        client = QrlRestClient(self._settings)
-        async with client as cli:
-            return await cli.ticker_24h()
-</file>
-
-<file path="src/app/application/market/use_cases/get_ticker.py">
-"""
-Market use case: get ticker for QRL/USDT.
-"""
-
-from dataclasses import dataclass
-
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
-
-
-@dataclass
-class GetTickerInput:
-    include_timestamp: bool = True
-
-
-class GetTickerUseCase:
-    """Fetch 24h ticker for the fixed QRL/USDT symbol."""
-
-    def __init__(self, settings: QrlSettings | None = None):
-        self._settings = settings or QrlSettings()
-
-    async def execute(self, data: GetTickerInput | None = None) -> dict:
-        client = QrlRestClient(self._settings)
-        async with client as cli:
-            return await cli.ticker_24h()
 </file>
 
 <file path="src/app/application/ports/__init__.py">
@@ -497,26 +319,6 @@ class ExchangeGateway(Protocol):
 
 <file path="src/app/application/system/use_cases/__init__.py">
 # System use cases.
-</file>
-
-<file path="src/app/application/system/use_cases/get_server_time.py">
-"""
-System use case: get server time.
-"""
-
-from dataclasses import dataclass
-from src.app.domain.value_objects.timestamp import Timestamp
-
-
-@dataclass
-class GetServerTimeOutput:
-    server_time: Timestamp | None = None
-
-
-class GetServerTimeUseCase:
-    def execute(self) -> GetServerTimeOutput:
-        # TODO: retrieve via port
-        return GetServerTimeOutput()
 </file>
 
 <file path="src/app/application/system/use_cases/ping.py">
@@ -603,232 +405,12 @@ def map_rest_trade_dto_to_domain(dto: dict) -> Trade:
 # QRL trading use cases package
 </file>
 
-<file path="src/app/application/trading/qrl/cancel_qrl_order.py">
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-
-
-class CancelQrlOrder:
-    """Cancel QRL/USDT order."""
-
-    def __init__(self, rest_client: QrlRestClient):
-        self._client = rest_client
-
-    async def execute(self, *, order_id: str | None = None, client_order_id: str | None = None) -> dict:
-        async with self._client as client:
-            return await client.cancel_order(order_id=order_id, client_order_id=client_order_id)
-</file>
-
-<file path="src/app/application/trading/qrl/get_qrl_order.py">
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-
-
-class GetQrlOrder:
-    """Fetch single QRL/USDT order details."""
-
-    def __init__(self, rest_client: QrlRestClient):
-        self._client = rest_client
-
-    async def execute(self, *, order_id: str | None = None, client_order_id: str | None = None) -> dict:
-        async with self._client as client:
-            return await client.get_order(order_id=order_id, client_order_id=client_order_id)
-</file>
-
 <file path="src/app/application/trading/qrl/guards/__init__.py">
 # QRL guard utilities
 </file>
 
-<file path="src/app/application/trading/qrl/place_qrl_order.py">
-from src.app.domain.value_objects.qrl_price import QrlPrice
-from src.app.domain.value_objects.qrl_quantity import QrlQuantity
-from src.app.domain.value_objects.qrl_usdt_pair import QrlUsdtPair
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-
-
-class PlaceQrlOrder:
-    """Place QRL/USDT order with fixed symbol and validated VOs."""
-
-    def __init__(self, rest_client: QrlRestClient):
-        self._client = rest_client
-
-    async def execute(
-        self,
-        *,
-        side: str,
-        order_type: str,
-        price: QrlPrice | None,
-        quantity: QrlQuantity,
-        time_in_force: str | None = "GTC",
-        client_order_id: str | None = None,
-    ) -> dict:
-        async with self._client as client:
-            return await client.create_order(
-                side=side,
-                order_type=order_type,
-                price=str(price.value) if price else None,
-                quantity=str(quantity.value),
-                time_in_force=time_in_force,
-                client_order_id=client_order_id,
-            )
-</file>
-
 <file path="src/app/application/trading/use_cases/__init__.py">
 # Trading use cases.
-</file>
-
-<file path="src/app/application/trading/use_cases/cancel_order.py">
-"""Trading use case: cancel existing order for QRL/USDT."""
-
-from dataclasses import dataclass
-
-from src.app.application.exchange.mexc_service import CancelOrderRequest, MexcService, build_mexc_service
-from src.app.application.trading.use_cases.place_order import _serialize_order
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
-
-
-@dataclass
-class CancelOrderInput:
-    symbol: str
-    order_id: str | None = None
-    client_order_id: str | None = None
-
-
-class CancelOrderUseCase:
-    settings: MexcSettings | None = None
-
-    def __init__(self, settings: MexcSettings | None = None):
-        self.settings = settings
-
-    async def execute(self, data: CancelOrderInput) -> dict:
-        request = CancelOrderRequest(
-            symbol=Symbol(data.symbol),
-            order_id=data.order_id,
-            client_order_id=data.client_order_id,
-        )
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            order = await svc.cancel_order(request)
-        return _serialize_order(order)
-</file>
-
-<file path="src/app/application/trading/use_cases/get_kline.py">
-from dataclasses import dataclass
-from typing import List
-
-from src.app.application.exchange.mexc_service import MexcService, build_mexc_service
-from src.app.domain.value_objects.kline import KLine
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
-
-
-def _serialize_kline(k: KLine) -> dict:
-    return {
-        "open": str(k.open),
-        "high": str(k.high),
-        "low": str(k.low),
-        "close": str(k.close),
-        "volume": str(k.volume),
-        "interval": k.interval,
-        "timestamp": k.timestamp.value.isoformat(),
-    }
-
-
-@dataclass
-class GetKlineUseCase:
-    settings: MexcSettings | None = None
-
-    async def execute(self, symbol: str, interval: str, limit: int = 100) -> List[dict]:
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            klines = await svc.get_kline(Symbol(symbol), interval=interval, limit=limit)
-        return [_serialize_kline(k) for k in klines]
-</file>
-
-<file path="src/app/application/trading/use_cases/get_order.py">
-"""Trading use case: get single order."""
-
-from dataclasses import dataclass
-
-from src.app.application.exchange.mexc_service import GetOrderRequest, MexcService, build_mexc_service
-from src.app.application.trading.use_cases.place_order import _serialize_order
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
-
-
-@dataclass
-class GetOrderInput:
-    symbol: str
-    order_id: str | None = None
-    client_order_id: str | None = None
-
-
-class GetOrderUseCase:
-    settings: MexcSettings | None = None
-
-    def __init__(self, settings: MexcSettings | None = None):
-        self.settings = settings
-
-    async def execute(self, data: GetOrderInput) -> dict:
-        request = GetOrderRequest(
-            symbol=Symbol(data.symbol),
-            order_id=data.order_id,
-            client_order_id=data.client_order_id,
-        )
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            order = await svc.get_order(request)
-        return _serialize_order(order)
-</file>
-
-<file path="src/app/application/trading/use_cases/get_price.py">
-from dataclasses import dataclass
-
-from src.app.application.exchange.mexc_service import MexcService, build_mexc_service
-from src.app.domain.value_objects.price import Price
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
-
-
-def _serialize_price(price: Price) -> dict:
-    return {
-        "bid": str(price.bid),
-        "ask": str(price.ask),
-        "last": str(price.last),
-        "timestamp": price.timestamp.value.isoformat(),
-    }
-
-
-@dataclass
-class GetPriceUseCase:
-    settings: MexcSettings | None = None
-
-    async def execute(self, symbol: str) -> dict:
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            price = await svc.get_price(Symbol(symbol))
-        return _serialize_price(price)
-</file>
-
-<file path="src/app/application/trading/use_cases/list_orders.py">
-"""Trading use case: list open/closed orders."""
-
-from src.app.application.exchange.mexc_service import MexcService, build_mexc_service
-from src.app.application.trading.use_cases.place_order import _serialize_order
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
-
-
-class ListOrdersUseCase:
-    settings: MexcSettings | None = None
-
-    def __init__(self, settings: MexcSettings | None = None):
-        self.settings = settings
-
-    async def execute(self, symbol: str | None = None) -> list[dict]:
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            orders = await svc.list_open_orders(Symbol(symbol) if symbol else None)
-        return [_serialize_order(order) for order in orders]
 </file>
 
 <file path="src/app/domain/__init__.py">
@@ -2610,217 +2192,6 @@ def register_all_routers(app: FastAPI) -> None:
 """API routers for JSON endpoints."""
 </file>
 
-<file path="src/app/interfaces/http/api/account_routes.py">
-from fastapi import APIRouter, HTTPException
-
-from src.app.application.account.use_cases.get_balance import GetBalanceUseCase
-
-router = APIRouter()
-
-
-@router.get("/balance")
-async def get_balance():
-    """Get subaccount balance for QRL/USDT."""
-    usecase = GetBalanceUseCase()
-    try:
-        return await usecase.execute()
-    except Exception as exc:
-        # Surface a clear error to the dashboard instead of a generic 500
-        raise HTTPException(status_code=502, detail=f"Failed to fetch balance: {exc}") from exc
-</file>
-
-<file path="src/app/interfaces/http/api/market_routes.py">
-from fastapi import APIRouter, Query
-
-from src.app.application.market.use_cases.get_depth import GetDepthUseCase
-from src.app.application.market.use_cases.get_kline import GetKlineUseCase
-from src.app.application.market.use_cases.get_market_trades import GetMarketTradesInput, GetMarketTradesUseCase
-from src.app.application.market.use_cases.get_stats24h import GetStats24hUseCase
-from src.app.application.market.use_cases.get_ticker import GetTickerUseCase
-
-router = APIRouter()
-
-
-@router.get("/depth")
-async def get_depth(limit: int = Query(default=50, ge=5, le=1000)):
-    """Get order book depth for QRL/USDT."""
-    usecase = GetDepthUseCase()
-    from src.app.application.market.use_cases.get_depth import GetDepthInput
-
-    return await usecase.execute(data=GetDepthInput(limit=limit))
-
-
-@router.get("/ticker")
-async def get_ticker():
-    """Get ticker for QRL/USDT."""
-    usecase = GetTickerUseCase()
-    return await usecase.execute()
-
-
-@router.get("/kline")
-async def get_kline(interval: str = Query(default="1m"), limit: int = Query(default=50, ge=1, le=500)):
-    """Get kline data for QRL/USDT."""
-    usecase = GetKlineUseCase()
-    from src.app.application.market.use_cases.get_kline import GetKlineInput
-
-    return await usecase.execute(data=GetKlineInput(interval=interval, limit=limit))
-
-
-@router.get("/stats24h")
-async def get_stats_24h():
-    """Get 24h statistics for QRL/USDT."""
-    usecase = GetStats24hUseCase()
-    return await usecase.execute()
-
-
-@router.get("/trades")
-async def get_market_trades(limit: int = Query(default=50, ge=1, le=500)):
-    """Get recent public trades for QRL/USDT."""
-    usecase = GetMarketTradesUseCase()
-    return await usecase.execute(data=GetMarketTradesInput(limit=limit))
-</file>
-
-<file path="src/app/interfaces/http/api/system_routes.py">
-from fastapi import APIRouter
-
-from src.app.application.system.use_cases.get_server_time import GetServerTimeUseCase
-from src.app.application.system.use_cases.ping import PingUseCase
-
-router = APIRouter()
-
-
-@router.get("/ping")
-async def ping():
-    """Ping endpoint."""
-    usecase = PingUseCase()
-    return await usecase.execute()
-
-
-@router.get("/time")
-async def get_server_time():
-    """Get server time."""
-    usecase = GetServerTimeUseCase()
-    return await usecase.execute()
-</file>
-
-<file path="src/app/interfaces/http/api/trading_api.py">
-from fastapi import APIRouter, Query
-
-from src.app.application.trading.use_cases.get_kline import GetKlineUseCase
-from src.app.application.trading.use_cases.get_price import GetPriceUseCase
-
-
-router = APIRouter()
-
-
-@router.get("/api/price/{symbol}")
-async def get_price(symbol: str):
-    usecase = GetPriceUseCase()
-    return await usecase.execute(symbol)
-
-
-@router.get("/api/kline/{symbol}/{interval}")
-async def get_kline(symbol: str, interval: str, limit: int = Query(default=60, ge=1, le=500)):
-    usecase = GetKlineUseCase()
-    return await usecase.execute(symbol, interval, limit)
-</file>
-
-<file path="src/app/interfaces/http/api/trading_routes.py">
-from decimal import Decimal
-
-from fastapi import APIRouter, Query
-from src.app.application.trading.use_cases.cancel_order import CancelOrderInput, CancelOrderUseCase
-from src.app.application.trading.use_cases.get_order import GetOrderInput, GetOrderUseCase
-from src.app.application.trading.use_cases.list_orders import ListOrdersUseCase
-from src.app.application.trading.use_cases.list_trades import ListTradesUseCase
-from src.app.application.trading.use_cases.place_order import PlaceOrderInput, PlaceOrderUseCase
-from src.app.interfaces.http.schemas import (
-    PlaceOrderRequest,
-)
-
-
-router = APIRouter()
-
-
-@router.post("/orders")
-async def place_order(request: PlaceOrderRequest):
-    """Place spot order for QRL/USDT (subaccount)."""
-    usecase = PlaceOrderUseCase()
-    data = PlaceOrderInput(
-        symbol=request.symbol,
-        side=request.side,
-        quantity=Decimal(request.quantity),
-        price=Decimal(request.price) if request.price is not None else None,
-        order_type=request.order_type,
-        time_in_force=request.time_in_force if request.time_in_force else "GTC",
-        client_order_id=request.client_order_id,
-    )
-    return await usecase.execute(data)
-
-
-@router.post("/orders/{order_id}/cancel")
-async def cancel_order(order_id: str, symbol: str = Query(default="QRLUSDT")):
-    """Cancel an existing order."""
-    usecase = CancelOrderUseCase()
-    data = CancelOrderInput(symbol=symbol, order_id=order_id, client_order_id=None)
-    return await usecase.execute(data)
-
-
-@router.get("/orders/{order_id}")
-async def get_order(order_id: str, symbol: str = Query(default="QRLUSDT")):
-    """Get order status."""
-    usecase = GetOrderUseCase()
-    data = GetOrderInput(symbol=symbol, order_id=order_id, client_order_id=None)
-    return await usecase.execute(data)
-
-
-@router.get("/orders")
-async def list_orders(symbol: str = Query(default="QRLUSDT")):
-    """List recent orders."""
-    usecase = ListOrdersUseCase()
-    return await usecase.execute(symbol=symbol)
-
-
-@router.get("/trades")
-async def list_trades(symbol: str = Query(default="QRLUSDT")):
-    """List recent trades."""
-    usecase = ListTradesUseCase()
-    return await usecase.execute(symbol)
-</file>
-
-<file path="src/app/interfaces/http/api/ws_routes.py">
-from fastapi import APIRouter, WebSocket
-
-from src.app.application.market.use_cases.get_ticker import GetTickerUseCase
-from src.app.application.trading.use_cases.list_orders import ListOrdersUseCase
-
-router = APIRouter()
-
-
-@router.websocket("/market/ticker")
-async def ticker_stream(websocket: WebSocket):
-    """WebSocket ticker stream placeholder."""
-    await websocket.accept()
-    usecase = GetTickerUseCase()
-    await usecase.execute()  # TODO: stream data
-    await websocket.close()
-
-
-@router.websocket("/trading/orders")
-async def order_stream(websocket: WebSocket):
-    """WebSocket order stream placeholder."""
-    await websocket.accept()
-    usecase = ListOrdersUseCase()
-    await usecase.execute()  # TODO: stream data
-    await websocket.close()
-</file>
-
-<file path="src/app/interfaces/http/dependencies.py">
-"""FastAPI dependencies for interface layer."""
-
-# TODO: add shared dependencies (auth, DB session, exchange client providers)
-</file>
-
 <file path="src/app/interfaces/http/pages/__init__.py">
 """HTML page controllers."""
 </file>
@@ -2861,131 +2232,228 @@ async def sync_trades():
     return None
 </file>
 
-<file path="src/app/application/account/use_cases/get_balance.py">
-"""Account use case: get subaccount balance with valuation."""
+<file path="src/app/application/market/qrl/get_qrl_depth.py">
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.application.market.use_cases.get_depth import _serialize_depth
+from src.app.domain.value_objects.symbol import Symbol
+
+
+class GetQrlDepth:
+    """Fetch QRL/USDT order book snapshot."""
+
+    def __init__(self, exchange_factory: ExchangeServiceFactory, limit: int = 50):
+        self._exchange_factory = exchange_factory
+        self._limit = limit
+
+    async def execute(self) -> dict:
+        async with self._exchange_factory() as exchange:
+            book = await exchange.get_depth(Symbol("QRLUSDT"), limit=self._limit)
+        return _serialize_depth(book)
+</file>
+
+<file path="src/app/application/market/qrl/get_qrl_kline.py">
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.domain.value_objects.symbol import Symbol
+
+
+class GetQrlKline:
+    """Fetch QRL/USDT kline data."""
+
+    def __init__(self, exchange_factory: ExchangeServiceFactory, interval: str = "1m", limit: int = 100):
+        self._exchange_factory = exchange_factory
+        self._interval = interval
+        self._limit = limit
+
+    async def execute(self) -> list:
+        async with self._exchange_factory() as exchange:
+            klines = await exchange.get_kline(
+                Symbol("QRLUSDT"), interval=self._interval, limit=self._limit
+            )
+        return [
+            [
+                int(k.timestamp.value.timestamp() * 1000),
+                str(k.open),
+                str(k.high),
+                str(k.low),
+                str(k.close),
+                str(k.volume),
+            ]
+            for k in klines
+        ]
+</file>
+
+<file path="src/app/application/market/use_cases/get_depth.py">
+"""
+Market use case: get order book depth for QRL/USDT.
+"""
 
 from dataclasses import dataclass
-from decimal import Decimal
 
-from src.app.application.exchange.mexc_service import MexcService, build_mexc_service
-from src.app.domain.entities.account import Account
-from src.app.domain.services.valuation_service import ValuationService
-from src.app.domain.value_objects.price import Price
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.domain.value_objects.order_book import OrderBook
 from src.app.domain.value_objects.symbol import Symbol
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
-
-
-def _mid(price: Price) -> Decimal:
-    return (price.bid + price.ask) / Decimal("2")
-
-
-def _aggregate_balances(account: Account) -> dict:
-    usdt_free = usdt_locked = Decimal("0")
-    qrl_free = qrl_locked = Decimal("0")
-    for balance in account.balances:
-        asset = balance.asset.upper()
-        if asset == "USDT":
-            usdt_free += balance.free
-            usdt_locked += balance.locked
-        elif asset == "QRL":
-            qrl_free += balance.free
-            qrl_locked += balance.locked
-    return {
-        "usdt_free": usdt_free,
-        "usdt_locked": usdt_locked,
-        "qrl_free": qrl_free,
-        "qrl_locked": qrl_locked,
-    }
-
-
-def _valuation(agg: dict, mid_price: Decimal | None) -> dict:
-    usdt_total = agg["usdt_free"] + agg["usdt_locked"]
-    if mid_price is None:
-        return {
-            "price_available": False,
-            "price_mid": None,
-            "qrl_available_value": None,
-            "qrl_locked_value": None,
-            "qrl_value_usdt": None,
-            "total_value_usdt": None,
-            "qrl_pct": None,
-            "usdt_pct": None,
-        }
-
-    qrl_available_value = ValuationService.value(agg["qrl_free"], mid_price)
-    qrl_locked_value = ValuationService.value(agg["qrl_locked"], mid_price)
-    qrl_value = qrl_available_value + qrl_locked_value
-    total_value = qrl_value + usdt_total
-
-    if total_value > 0:
-        qrl_pct = (qrl_value / total_value) * Decimal("100")
-        usdt_pct = (usdt_total / total_value) * Decimal("100")
-    else:
-        qrl_pct = None
-        usdt_pct = None
-
-    return {
-        "price_available": True,
-        "price_mid": str(mid_price),
-        "qrl_available_value": str(qrl_available_value),
-        "qrl_locked_value": str(qrl_locked_value),
-        "qrl_value_usdt": str(qrl_value),
-        "total_value_usdt": str(total_value),
-        "qrl_pct": str(qrl_pct) if qrl_pct is not None else None,
-        "usdt_pct": str(usdt_pct) if usdt_pct is not None else None,
-    }
-
-
-def _serialize_account(account: Account, valuation: dict) -> dict:
-    return {
-        "can_trade": account.can_trade,
-        "update_time": account.update_time.value.isoformat(),
-        "balances": [
-            {
-                "asset": balance.asset,
-                "free": str(balance.free),
-                "locked": str(balance.locked),
-                "free_value_usdt": (
-                    valuation["qrl_available_value"] if balance.asset.upper() == "QRL" else None
-                ),
-                "locked_value_usdt": (
-                    valuation["qrl_locked_value"] if balance.asset.upper() == "QRL" else None
-                ),
-            }
-            for balance in account.balances
-        ],
-        "valuation": valuation,
-    }
 
 
 @dataclass
-class GetBalanceUseCase:
-    settings: MexcSettings | None = None
+class GetDepthInput:
+    limit: int = 50
 
-    async def execute(self) -> dict:
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            account = await svc.get_account()
-            try:
-                price = await svc.get_price(Symbol("QRLUSDT"))
-                mid = _mid(price)
-            except Exception:
-                price = None
-                mid = None
 
-        agg = _aggregate_balances(account)
-        valuation = _valuation(agg, mid)
-        return _serialize_account(account, valuation)
+class GetDepthUseCase:
+    """Fetch aggregated depth for the fixed QRL/USDT symbol."""
+
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self, data: GetDepthInput | None = None) -> dict:
+        payload = data or GetDepthInput()
+        async with self._exchange_factory() as exchange:
+            depth = await exchange.get_depth(Symbol("QRLUSDT"), limit=payload.limit)
+        return _serialize_depth(depth)
+
+
+def _serialize_depth(book: OrderBook) -> dict:
+    return {
+        "bids": [[str(level.price), str(level.quantity)] for level in book.bids],
+        "asks": [[str(level.price), str(level.quantity)] for level in book.asks],
+    }
 </file>
 
-<file path="src/app/application/exchange/mexc_service.py">
+<file path="src/app/application/market/use_cases/get_kline.py">
+"""
+Market use case: get kline data for QRL/USDT.
+"""
+
 from dataclasses import dataclass
-from decimal import Decimal
-from typing import Iterable
+
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.domain.value_objects.kline import KLine
+from src.app.domain.value_objects.symbol import Symbol
+
+
+@dataclass
+class GetKlineInput:
+    interval: str = "1m"
+    limit: int = 50
+
+
+class GetKlineUseCase:
+    """Fetch klines for the fixed QRL/USDT symbol."""
+
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self, data: GetKlineInput | None = None) -> list:
+        payload = data or GetKlineInput()
+        async with self._exchange_factory() as exchange:
+            klines = await exchange.get_kline(
+                Symbol("QRLUSDT"), interval=payload.interval, limit=payload.limit
+            )
+        return [_serialize_kline(kline) for kline in klines]
+
+
+def _serialize_kline(kline: KLine) -> dict:
+    return {
+        "open": str(kline.open),
+        "high": str(kline.high),
+        "low": str(kline.low),
+        "close": str(kline.close),
+        "volume": str(kline.volume),
+        "interval": kline.interval,
+        "timestamp": kline.timestamp.value.isoformat(),
+    }
+</file>
+
+<file path="src/app/application/market/use_cases/get_market_trades.py">
+"""
+Market use case: recent public trades for QRL/USDT.
+"""
+
+from dataclasses import dataclass
+
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.domain.value_objects.symbol import Symbol
+
+
+@dataclass
+class GetMarketTradesInput:
+    limit: int = 50
+
+
+class GetMarketTradesUseCase:
+    """Fetch recent public trades for the fixed QRL/USDT symbol."""
+
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self, data: GetMarketTradesInput | None = None) -> list:
+        payload = data or GetMarketTradesInput()
+        async with self._exchange_factory() as exchange:
+            return await exchange.get_market_trades(Symbol("QRLUSDT"), limit=payload.limit)
+</file>
+
+<file path="src/app/application/market/use_cases/get_stats24h.py">
+"""
+Market use case: 24h stats for QRL/USDT.
+"""
+
+from dataclasses import dataclass
+
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.domain.value_objects.symbol import Symbol
+
+
+@dataclass
+class GetStats24hInput:
+    include_timestamp: bool = True
+
+
+class GetStats24hUseCase:
+    """Fetch 24h statistics for the fixed QRL/USDT symbol."""
+
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self, data: GetStats24hInput | None = None) -> dict:
+        async with self._exchange_factory() as exchange:
+            return await exchange.get_ticker_24h(Symbol("QRLUSDT"))
+</file>
+
+<file path="src/app/application/market/use_cases/get_ticker.py">
+"""
+Market use case: get ticker for QRL/USDT.
+"""
+
+from dataclasses import dataclass
+
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.domain.value_objects.symbol import Symbol
+
+
+@dataclass
+class GetTickerInput:
+    include_timestamp: bool = True
+
+
+class GetTickerUseCase:
+    """Fetch 24h ticker for the fixed QRL/USDT symbol."""
+
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self, data: GetTickerInput | None = None) -> dict:
+        async with self._exchange_factory() as exchange:
+            return await exchange.get_ticker_24h(Symbol("QRLUSDT"))
+</file>
+
+<file path="src/app/application/ports/exchange_service.py">
+from dataclasses import dataclass
+from typing import AsyncContextManager, Callable, Protocol
 
 from src.app.domain.entities.account import Account
 from src.app.domain.entities.order import Order
 from src.app.domain.entities.trade import Trade
+from src.app.domain.value_objects.kline import KLine
 from src.app.domain.value_objects.order_book import OrderBook
 from src.app.domain.value_objects.order_type import OrderType
 from src.app.domain.value_objects.price import Price
@@ -2994,27 +2462,9 @@ from src.app.domain.value_objects.side import Side
 from src.app.domain.value_objects.symbol import Symbol
 from src.app.domain.value_objects.time_in_force import TimeInForce
 from src.app.domain.value_objects.timestamp import Timestamp
-from src.app.infrastructure.exchange.mexc.mappers import (
-    account_from_api,
-    order_book_from_api,
-    order_from_api,
-    server_time_to_timestamp,
-    trade_from_api,
-)
-from src.app.infrastructure.exchange.mexc.rest_client import MexcRestClient
-from src.app.infrastructure.exchange.mexc_api_client import MexcApiClient
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
 
-def _to_str(value: Decimal | None) -> str | None:
-    return str(value) if value is not None else None
-
-
-def _symbol_value(symbol: Symbol) -> str:
-    return symbol.value.replace("/", "").upper()
-
-
-@dataclass
+@dataclass(frozen=True)
 class PlaceOrderRequest:
     symbol: Symbol
     side: Side
@@ -3025,155 +2475,75 @@ class PlaceOrderRequest:
     client_order_id: str | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class CancelOrderRequest:
     symbol: Symbol
     order_id: str | None = None
     client_order_id: str | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class GetOrderRequest:
     symbol: Symbol
     order_id: str | None = None
     client_order_id: str | None = None
 
 
-class MexcService:
-    """Application-level service that wraps the MEXC REST client."""
+class ExchangeService(Protocol, AsyncContextManager["ExchangeService"]):
+    """Application port exposing required exchange operations."""
 
-    def __init__(self, rest_client: MexcRestClient):
-        self._rest_client = rest_client
-        self._api_client = MexcApiClient(rest_client)
+    async def get_server_time(self) -> Timestamp: ...
 
-    async def __aenter__(self) -> "MexcService":
-        await self._api_client.__aenter__()
-        return self
+    async def get_account(self) -> Account: ...
 
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self._api_client.__aexit__(exc_type, exc, tb)
+    async def place_order(self, request: PlaceOrderRequest) -> Order: ...
 
-    async def get_server_time(self) -> Timestamp:
-        payload = await self._rest_client.get_server_time()
-        return server_time_to_timestamp(payload)
+    async def cancel_order(self, request: CancelOrderRequest) -> Order: ...
 
-    async def get_account(self) -> Account:
-        payload = await self._rest_client.get_account()
-        return account_from_api(payload)
+    async def get_order(self, request: GetOrderRequest) -> Order: ...
 
-    async def place_order(self, request: PlaceOrderRequest) -> Order:
-        if request.order_type.value == "LIMIT" and request.price is None:
-            raise ValueError("Limit orders require price")
-        payload = {
-            "symbol": _symbol_value(request.symbol),
-            "side": request.side.value,
-            "order_type": request.order_type.value,
-            "quantity": _to_str(request.quantity.value),
-            "price": _to_str(request.price.last) if request.price else None,
-            "time_in_force": request.time_in_force.value if request.time_in_force else None,
-            "client_order_id": request.client_order_id,
-        }
-        response = await self._rest_client.create_order(**payload)
-        return order_from_api(response)
+    async def list_open_orders(self, symbol: Symbol | None = None) -> list[Order]: ...
 
-    async def cancel_order(self, request: CancelOrderRequest) -> Order:
-        response = await self._rest_client.cancel_order(
-            symbol=_symbol_value(request.symbol),
-            order_id=request.order_id,
-            client_order_id=request.client_order_id,
-        )
-        return order_from_api(response)
+    async def list_trades(self, symbol: Symbol) -> list[Trade]: ...
 
-    async def get_order(self, request: GetOrderRequest) -> Order:
-        response = await self._rest_client.get_order(
-            symbol=_symbol_value(request.symbol),
-            order_id=request.order_id,
-            client_order_id=request.client_order_id,
-        )
-        return order_from_api(response)
+    async def get_price(self, symbol: Symbol) -> Price: ...
 
-    async def list_open_orders(self, symbol: Symbol | None = None) -> list[Order]:
-        response = await self._rest_client.list_open_orders(
-            symbol=_symbol_value(symbol) if symbol else None
-        )
-        return [order_from_api(item) for item in response]
+    async def get_kline(self, symbol: Symbol, interval: str, limit: int = 100) -> list[KLine]: ...
 
-    async def list_trades(self, symbol: Symbol) -> list[Trade]:
-        response = await self._rest_client.list_trades(symbol=_symbol_value(symbol))
-        return [trade_from_api(item) for item in response]
+    async def get_depth(self, symbol: Symbol, limit: int = 50) -> OrderBook: ...
 
-    async def get_price(self, symbol: Symbol) -> Price:
-        from src.app.domain.entities.trading_pair import TradingPair
+    async def get_ticker_24h(self, symbol: Symbol) -> dict: ...
 
-        base = symbol.value.replace("/", "").upper().removesuffix("USDT")
-        tp = TradingPair(base_currency=base, quote_currency="USDT")
-        return await self._api_client.get_price(tp)
-
-    async def get_kline(self, symbol: Symbol, interval: str, limit: int = 100) -> list["KLine"]:
-        from src.app.domain.entities.trading_pair import TradingPair
-        from src.app.domain.value_objects.kline import KLine
-
-        base = symbol.value.replace("/", "").upper().removesuffix("USDT")
-        tp = TradingPair(base_currency=base, quote_currency="USDT")
-        return await self._api_client.get_klines(tp, interval=interval, limit=limit)
-
-    async def get_depth(self, symbol: Symbol, limit: int = 50) -> OrderBook:
-        response = await self._rest_client.depth(symbol=_symbol_value(symbol), limit=limit)
-        return order_book_from_api(response)
+    async def get_market_trades(self, symbol: Symbol, limit: int = 50) -> list[dict]: ...
 
 
-def build_mexc_service(settings: MexcSettings) -> MexcService:
-    """Factory to build a service with shared settings."""
-    return MexcService(MexcRestClient(settings))
+ExchangeServiceFactory = Callable[[], ExchangeService]
 </file>
 
-<file path="src/app/application/market/qrl/get_qrl_price.py">
-from dataclasses import asdict, dataclass
-from typing import Any
+<file path="src/app/application/system/use_cases/get_server_time.py">
+"""
+System use case: get server time.
+"""
 
-from src.app.domain.value_objects.qrl_price import QrlPrice
-from src.app.domain.value_objects.qrl_usdt_pair import QrlUsdtPair
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
+from dataclasses import dataclass
 
-
-@dataclass(frozen=True)
-class QrlPriceSnapshot:
-    bid: str | None
-    ask: str | None
-    last: str
-    timestamp: int | None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.domain.value_objects.timestamp import Timestamp
 
 
-class GetQrlPrice:
-    """Fetch QRL/USDT price using the dedicated REST client."""
+@dataclass
+class GetServerTimeOutput:
+    server_time: Timestamp | None = None
 
-    def __init__(self, rest_client: QrlRestClient):
-        self._client = rest_client
 
-    async def execute(self) -> QrlPriceSnapshot:
-        async with self._client as client:
-            ticker = await client.ticker_24h()
-        bid = ticker.get("bidPrice") or ticker.get("bid")
-        ask = ticker.get("askPrice") or ticker.get("ask")
-        last = ticker.get("lastPrice") or ticker.get("last")
-        if last is None:
-            raise ValueError("QRL price unavailable")
-        price_vo = QrlPrice(last)
-        timestamp = (
-            ticker.get("time")
-            or ticker.get("timestamp")
-            or ticker.get("closeTime")
-            or ticker.get("t")  # some SDKs return shorthand
-        )
-        return QrlPriceSnapshot(
-            bid=str(bid) if bid is not None else None,
-            ask=str(ask) if ask is not None else None,
-            last=str(price_vo.value),
-            timestamp=timestamp,
-        )
+class GetServerTimeUseCase:
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self) -> GetServerTimeOutput:
+        async with self._exchange_factory() as exchange:
+            server_time = await exchange.get_server_time()
+        return GetServerTimeOutput(server_time=server_time)
 </file>
 
 <file path="src/app/application/trading/dtos.py">
@@ -3216,6 +2586,51 @@ class TradeDTO:
         return asdict(self)
 </file>
 
+<file path="src/app/application/trading/qrl/cancel_qrl_order.py">
+from src.app.application.ports.exchange_service import CancelOrderRequest, ExchangeServiceFactory
+from src.app.domain.value_objects.symbol import Symbol
+
+
+class CancelQrlOrder:
+    """Cancel QRL/USDT order."""
+
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self, *, order_id: str | None = None, client_order_id: str | None = None) -> dict:
+        request = CancelOrderRequest(
+            symbol=Symbol("QRLUSDT"), order_id=order_id, client_order_id=client_order_id
+        )
+        async with self._exchange_factory() as exchange:
+            order = await exchange.cancel_order(request)
+        return {
+            "orderId": order.order_id.value,
+            "symbol": order.symbol.value,
+            "status": order.status.value,
+        }
+</file>
+
+<file path="src/app/application/trading/qrl/get_qrl_order.py">
+from src.app.application.ports.exchange_service import ExchangeServiceFactory, GetOrderRequest
+from src.app.application.trading.use_cases.place_order import _serialize_order
+from src.app.domain.value_objects.symbol import Symbol
+
+
+class GetQrlOrder:
+    """Fetch single QRL/USDT order details."""
+
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self, *, order_id: str | None = None, client_order_id: str | None = None) -> dict:
+        request = GetOrderRequest(
+            symbol=Symbol("QRLUSDT"), order_id=order_id, client_order_id=client_order_id
+        )
+        async with self._exchange_factory() as exchange:
+            order = await exchange.get_order(request)
+        return _serialize_order(order)
+</file>
+
 <file path="src/app/application/trading/qrl/guards/qrl_balance_guard.py">
 from src.app.domain.services.qrl_guards import ensure_sufficient_balance
 
@@ -3238,6 +2653,197 @@ __all__ = ["ensure_price_range"]
 from src.app.domain.services.qrl_guards import enforce_rate_limit
 
 __all__ = ["enforce_rate_limit"]
+</file>
+
+<file path="src/app/application/trading/qrl/place_qrl_order.py">
+from src.app.application.ports.exchange_service import ExchangeServiceFactory, PlaceOrderRequest
+from src.app.application.trading.use_cases.place_order import _serialize_order
+from src.app.domain.value_objects.order_type import OrderType
+from src.app.domain.value_objects.price import Price
+from src.app.domain.value_objects.qrl_price import QrlPrice
+from src.app.domain.value_objects.qrl_quantity import QrlQuantity
+from src.app.domain.value_objects.quantity import Quantity
+from src.app.domain.value_objects.side import Side
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.time_in_force import TimeInForce
+
+
+class PlaceQrlOrder:
+    """Place QRL/USDT order with fixed symbol and validated VOs."""
+
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(
+        self,
+        *,
+        side: str,
+        order_type: str,
+        price: QrlPrice | None,
+        quantity: QrlQuantity,
+        time_in_force: str | None = "GTC",
+        client_order_id: str | None = None,
+    ) -> dict:
+        price_vo = Price.from_single(price.value) if price else None
+        quantity_vo = Quantity(quantity.value)
+        request = PlaceOrderRequest(
+            symbol=Symbol("QRLUSDT"),
+            side=Side(side),
+            order_type=OrderType(order_type),
+            price=price_vo,
+            quantity=quantity_vo,
+            time_in_force=TimeInForce(time_in_force) if time_in_force else None,
+            client_order_id=client_order_id,
+        )
+        async with self._exchange_factory() as exchange:
+            order = await exchange.place_order(request)
+        return _serialize_order(order)
+</file>
+
+<file path="src/app/application/trading/use_cases/cancel_order.py">
+"""Trading use case: cancel existing order for QRL/USDT."""
+
+from dataclasses import dataclass
+
+from src.app.application.ports.exchange_service import (
+    CancelOrderRequest,
+    ExchangeServiceFactory,
+)
+from src.app.application.trading.use_cases.place_order import _serialize_order
+from src.app.domain.value_objects.symbol import Symbol
+
+
+@dataclass(frozen=True)
+class CancelOrderInput:
+    symbol: str
+    order_id: str | None = None
+    client_order_id: str | None = None
+
+
+class CancelOrderUseCase:
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self, data: CancelOrderInput) -> dict:
+        request = CancelOrderRequest(
+            symbol=Symbol(data.symbol),
+            order_id=data.order_id,
+            client_order_id=data.client_order_id,
+        )
+        async with self._exchange_factory() as exchange:
+            order = await exchange.cancel_order(request)
+        return _serialize_order(order)
+</file>
+
+<file path="src/app/application/trading/use_cases/get_kline.py">
+from dataclasses import dataclass
+from typing import List
+
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.domain.value_objects.kline import KLine
+from src.app.domain.value_objects.symbol import Symbol
+
+
+def _serialize_kline(k: KLine) -> dict:
+    return {
+        "open": str(k.open),
+        "high": str(k.high),
+        "low": str(k.low),
+        "close": str(k.close),
+        "volume": str(k.volume),
+        "interval": k.interval,
+        "timestamp": k.timestamp.value.isoformat(),
+    }
+
+
+@dataclass
+class GetKlineUseCase:
+    exchange_factory: ExchangeServiceFactory
+
+    async def execute(self, symbol: str, interval: str, limit: int = 100) -> List[dict]:
+        async with self.exchange_factory() as exchange:
+            klines = await exchange.get_kline(Symbol(symbol), interval=interval, limit=limit)
+        return [_serialize_kline(k) for k in klines]
+</file>
+
+<file path="src/app/application/trading/use_cases/get_order.py">
+"""Trading use case: get single order."""
+
+from dataclasses import dataclass
+
+from src.app.application.ports.exchange_service import (
+    ExchangeServiceFactory,
+    GetOrderRequest,
+)
+from src.app.application.trading.use_cases.place_order import _serialize_order
+from src.app.domain.value_objects.symbol import Symbol
+
+
+@dataclass(frozen=True)
+class GetOrderInput:
+    symbol: str
+    order_id: str | None = None
+    client_order_id: str | None = None
+
+
+class GetOrderUseCase:
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self, data: GetOrderInput) -> dict:
+        request = GetOrderRequest(
+            symbol=Symbol(data.symbol),
+            order_id=data.order_id,
+            client_order_id=data.client_order_id,
+        )
+        async with self._exchange_factory() as exchange:
+            order = await exchange.get_order(request)
+        return _serialize_order(order)
+</file>
+
+<file path="src/app/application/trading/use_cases/get_price.py">
+from dataclasses import dataclass
+
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.domain.value_objects.price import Price
+from src.app.domain.value_objects.symbol import Symbol
+
+
+def _serialize_price(price: Price) -> dict:
+    return {
+        "bid": str(price.bid),
+        "ask": str(price.ask),
+        "last": str(price.last),
+        "timestamp": price.timestamp.value.isoformat(),
+    }
+
+
+@dataclass
+class GetPriceUseCase:
+    exchange_factory: ExchangeServiceFactory
+
+    async def execute(self, symbol: str) -> dict:
+        async with self.exchange_factory() as exchange:
+            price = await exchange.get_price(Symbol(symbol))
+        return _serialize_price(price)
+</file>
+
+<file path="src/app/application/trading/use_cases/list_orders.py">
+"""Trading use case: list open/closed orders."""
+
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.application.trading.use_cases.place_order import _serialize_order
+from src.app.domain.value_objects.symbol import Symbol
+
+
+class ListOrdersUseCase:
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self, symbol: str | None = None) -> list[dict]:
+        async with self._exchange_factory() as exchange:
+            orders = await exchange.list_open_orders(Symbol(symbol) if symbol else None)
+        return [_serialize_order(order) for order in orders]
 </file>
 
 <file path="src/app/domain/entities/order.py">
@@ -3818,134 +3424,393 @@ class QrlRestClient:
         )
 </file>
 
-<file path="src/app/interfaces/http/api/qrl_routes.py">
-import asyncio
+<file path="src/app/infrastructure/exchange/mexc/service.py">
 from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException, Query
+from src.app.application.ports.exchange_service import (
+    CancelOrderRequest,
+    ExchangeService,
+    GetOrderRequest,
+    PlaceOrderRequest,
+)
+from src.app.domain.entities.trading_pair import TradingPair
+from src.app.domain.value_objects.order_book import OrderBook
+from src.app.domain.value_objects.price import Price
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.infrastructure.exchange.mexc.mappers import (
+    account_from_api,
+    order_book_from_api,
+    order_from_api,
+    server_time_to_timestamp,
+    trade_from_api,
+)
+from src.app.infrastructure.exchange.mexc.rest_client import MexcRestClient
+from src.app.infrastructure.exchange.mexc.settings import MexcSettings
+from src.app.infrastructure.exchange.mexc_api_client import MexcApiClient
 
-from src.app.application.market.qrl.get_qrl_depth import GetQrlDepth
-from src.app.application.market.qrl.get_qrl_kline import GetQrlKline
-from src.app.application.market.qrl.get_qrl_price import GetQrlPrice
-from src.app.application.market.use_cases.get_market_trades import GetMarketTradesUseCase
-from src.app.application.trading.qrl.cancel_qrl_order import CancelQrlOrder
-from src.app.application.trading.qrl.get_qrl_order import GetQrlOrder
-from src.app.application.trading.qrl.place_qrl_order import PlaceQrlOrder
+
+def _to_str(value: Decimal | None) -> str | None:
+    return str(value) if value is not None else None
+
+
+def _symbol_value(symbol: Symbol) -> str:
+    return symbol.value.replace("/", "").upper()
+
+
+class MexcExchangeService(ExchangeService):
+    """Infrastructure adapter implementing the exchange port."""
+
+    def __init__(self, settings: MexcSettings):
+        self._rest_client = MexcRestClient(settings)
+        self._api_client = MexcApiClient(self._rest_client)
+
+    async def __aenter__(self) -> "MexcExchangeService":
+        await self._api_client.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        await self._api_client.__aexit__(exc_type, exc, tb)
+
+    async def get_server_time(self):
+        payload = await self._rest_client.get_server_time()
+        return server_time_to_timestamp(payload)
+
+    async def get_account(self):
+        payload = await self._rest_client.get_account()
+        return account_from_api(payload)
+
+    async def place_order(self, request: PlaceOrderRequest):
+        if request.order_type.value == "LIMIT" and request.price is None:
+            raise ValueError("Limit orders require price")
+        payload = {
+            "symbol": _symbol_value(request.symbol),
+            "side": request.side.value,
+            "order_type": request.order_type.value,
+            "quantity": _to_str(request.quantity.value),
+            "price": _to_str(request.price.last) if request.price else None,
+            "time_in_force": request.time_in_force.value if request.time_in_force else None,
+            "client_order_id": request.client_order_id,
+        }
+        response = await self._rest_client.create_order(**payload)
+        return order_from_api(response)
+
+    async def cancel_order(self, request: CancelOrderRequest):
+        response = await self._rest_client.cancel_order(
+            symbol=_symbol_value(request.symbol),
+            order_id=request.order_id,
+            client_order_id=request.client_order_id,
+        )
+        return order_from_api(response)
+
+    async def get_order(self, request: GetOrderRequest):
+        response = await self._rest_client.get_order(
+            symbol=_symbol_value(request.symbol),
+            order_id=request.order_id,
+            client_order_id=request.client_order_id,
+        )
+        return order_from_api(response)
+
+    async def list_open_orders(self, symbol: Symbol | None = None):
+        response = await self._rest_client.list_open_orders(
+            symbol=_symbol_value(symbol) if symbol else None
+        )
+        return [order_from_api(item) for item in response]
+
+    async def list_trades(self, symbol: Symbol):
+        response = await self._rest_client.list_trades(symbol=_symbol_value(symbol))
+        return [trade_from_api(item) for item in response]
+
+    async def get_price(self, symbol: Symbol) -> Price:
+        base = symbol.value.replace("/", "").upper().removesuffix("USDT")
+        pair = TradingPair(base_currency=base, quote_currency="USDT")
+        return await self._api_client.get_price(pair)
+
+    async def get_kline(self, symbol: Symbol, interval: str, limit: int = 100):
+        base = symbol.value.replace("/", "").upper().removesuffix("USDT")
+        pair = TradingPair(base_currency=base, quote_currency="USDT")
+        return await self._api_client.get_klines(pair, interval=interval, limit=limit)
+
+    async def get_depth(self, symbol: Symbol, limit: int = 50) -> OrderBook:
+        response = await self._rest_client.depth(symbol=_symbol_value(symbol), limit=limit)
+        return order_book_from_api(response)
+
+    async def get_ticker_24h(self, symbol: Symbol) -> dict:
+        return await self._rest_client.ticker_24h(symbol=_symbol_value(symbol))
+
+    async def get_market_trades(self, symbol: Symbol, limit: int = 50) -> list[dict]:
+        return await self._rest_client.trades(symbol=_symbol_value(symbol), limit=limit)
+
+
+def build_mexc_exchange_service(settings: MexcSettings) -> MexcExchangeService:
+    return MexcExchangeService(settings)
+</file>
+
+<file path="src/app/interfaces/http/api/account_routes.py">
+from fastapi import APIRouter, Depends, HTTPException
+
 from src.app.application.account.use_cases.get_balance import GetBalanceUseCase
-from src.app.application.trading.use_cases.list_orders import ListOrdersUseCase
-from src.app.application.trading.use_cases.list_trades import ListTradesUseCase
-from src.app.domain.value_objects.qrl_price import QrlPrice
-from src.app.domain.value_objects.qrl_quantity import QrlQuantity
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
-from src.app.interfaces.http.schemas import PlaceOrderRequest
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.interfaces.http.dependencies import get_exchange_factory
 
 router = APIRouter()
 
 
-def _client() -> QrlRestClient:
-    return QrlRestClient(QrlSettings())
-
-
-@router.get("/price")
-async def qrl_price():
-    usecase = GetQrlPrice(_client())
-    try:
-        snapshot = await usecase.execute()
-        return snapshot.to_dict()
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL price: {exc}") from exc
-
-
-@router.get("/kline")
-async def qrl_kline(interval: str = Query(default="1m"), limit: int = Query(default=50, ge=1, le=500)):
-    usecase = GetQrlKline(_client(), interval=interval, limit=limit)
-    try:
-        raw = await usecase.execute()
-        normalized = [
-            {"timestamp": item[0], "open": item[1], "high": item[2], "low": item[3], "close": item[4], "volume": item[5]}
-            for item in raw
-        ]
-        return normalized
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL klines: {exc}") from exc
-
-
-@router.get("/depth")
-async def qrl_depth(limit: int = Query(default=50, ge=5, le=1000)):
-    usecase = GetQrlDepth(_client(), limit=limit)
+@router.get("/balance")
+async def get_balance(exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)):
+    """Get subaccount balance for QRL/USDT."""
+    usecase = GetBalanceUseCase(exchange_factory)
     try:
         return await usecase.execute()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL depth: {exc}") from exc
+        # Surface a clear error to the dashboard instead of a generic 500
+        raise HTTPException(status_code=502, detail=f"Failed to fetch balance: {exc}") from exc
+</file>
+
+<file path="src/app/interfaces/http/api/market_routes.py">
+from fastapi import APIRouter, Depends, Query
+
+from src.app.application.market.use_cases.get_depth import GetDepthInput, GetDepthUseCase
+from src.app.application.market.use_cases.get_kline import GetKlineInput, GetKlineUseCase
+from src.app.application.market.use_cases.get_market_trades import GetMarketTradesInput, GetMarketTradesUseCase
+from src.app.application.market.use_cases.get_stats24h import GetStats24hUseCase
+from src.app.application.market.use_cases.get_ticker import GetTickerUseCase
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.interfaces.http.dependencies import get_exchange_factory
+
+router = APIRouter()
+
+
+@router.get("/depth")
+async def get_depth(
+    limit: int = Query(default=50, ge=5, le=1000),
+    exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory),
+):
+    """Get order book depth for QRL/USDT."""
+    usecase = GetDepthUseCase(exchange_factory)
+    return await usecase.execute(data=GetDepthInput(limit=limit))
+
+
+@router.get("/ticker")
+async def get_ticker(exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)):
+    """Get ticker for QRL/USDT."""
+    usecase = GetTickerUseCase(exchange_factory)
+    return await usecase.execute()
+
+
+@router.get("/kline")
+async def get_kline(
+    interval: str = Query(default="1m"),
+    limit: int = Query(default=50, ge=1, le=500),
+    exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory),
+):
+    """Get kline data for QRL/USDT."""
+    usecase = GetKlineUseCase(exchange_factory)
+    return await usecase.execute(data=GetKlineInput(interval=interval, limit=limit))
+
+
+@router.get("/stats24h")
+async def get_stats_24h(exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)):
+    """Get 24h statistics for QRL/USDT."""
+    usecase = GetStats24hUseCase(exchange_factory)
+    return await usecase.execute()
+
+
+@router.get("/trades")
+async def get_market_trades(
+    limit: int = Query(default=50, ge=1, le=500),
+    exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory),
+):
+    """Get recent public trades for QRL/USDT."""
+    usecase = GetMarketTradesUseCase(exchange_factory)
+    return await usecase.execute(data=GetMarketTradesInput(limit=limit))
+</file>
+
+<file path="src/app/interfaces/http/api/system_routes.py">
+from fastapi import APIRouter, Depends
+
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.application.system.use_cases.get_server_time import GetServerTimeUseCase
+from src.app.application.system.use_cases.ping import PingUseCase
+from src.app.interfaces.http.dependencies import get_exchange_factory
+
+router = APIRouter()
+
+
+@router.get("/ping")
+async def ping():
+    """Ping endpoint."""
+    usecase = PingUseCase()
+    return await usecase.execute()
+
+
+@router.get("/time")
+async def get_server_time(exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)):
+    """Get server time."""
+    usecase = GetServerTimeUseCase(exchange_factory)
+    return await usecase.execute()
+</file>
+
+<file path="src/app/interfaces/http/api/trading_api.py">
+from fastapi import APIRouter, Depends, Query
+
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.application.trading.use_cases.get_kline import GetKlineUseCase
+from src.app.application.trading.use_cases.get_price import GetPriceUseCase
+from src.app.interfaces.http.dependencies import get_exchange_factory
+
+
+router = APIRouter()
+
+
+@router.get("/api/price/{symbol}")
+async def get_price(symbol: str, exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)):
+    usecase = GetPriceUseCase(exchange_factory)
+    return await usecase.execute(symbol)
+
+
+@router.get("/api/kline/{symbol}/{interval}")
+async def get_kline(
+    symbol: str,
+    interval: str,
+    limit: int = Query(default=60, ge=1, le=500),
+    exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory),
+):
+    usecase = GetKlineUseCase(exchange_factory)
+    return await usecase.execute(symbol, interval, limit)
+</file>
+
+<file path="src/app/interfaces/http/api/trading_routes.py">
+from decimal import Decimal
+
+from fastapi import APIRouter, Depends, Query
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.application.trading.use_cases.cancel_order import CancelOrderInput, CancelOrderUseCase
+from src.app.application.trading.use_cases.get_order import GetOrderInput, GetOrderUseCase
+from src.app.application.trading.use_cases.list_orders import ListOrdersUseCase
+from src.app.application.trading.use_cases.list_trades import ListTradesUseCase
+from src.app.application.trading.use_cases.place_order import PlaceOrderInput, PlaceOrderUseCase
+from src.app.interfaces.http.dependencies import get_exchange_factory
+from src.app.interfaces.http.schemas import (
+    PlaceOrderRequest,
+)
+
+
+router = APIRouter()
 
 
 @router.post("/orders")
-async def qrl_place_order(request: PlaceOrderRequest):
-    usecase = PlaceQrlOrder(_client())
-    price_vo = QrlPrice(request.price) if request.price is not None else None
-    qty_vo = QrlQuantity(request.quantity)
-    return await usecase.execute(
+async def place_order(
+    request: PlaceOrderRequest, exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)
+):
+    """Place spot order for QRL/USDT (subaccount)."""
+    usecase = PlaceOrderUseCase(exchange_factory)
+    data = PlaceOrderInput(
+        symbol=request.symbol,
         side=request.side,
+        quantity=Decimal(request.quantity),
+        price=Decimal(request.price) if request.price is not None else None,
         order_type=request.order_type,
-        price=price_vo,
-        quantity=qty_vo,
-        time_in_force=request.time_in_force,
+        time_in_force=request.time_in_force if request.time_in_force else "GTC",
         client_order_id=request.client_order_id,
     )
+    return await usecase.execute(data)
 
 
 @router.post("/orders/{order_id}/cancel")
-async def qrl_cancel_order(order_id: str):
-    usecase = CancelQrlOrder(_client())
-    return await usecase.execute(order_id=order_id, client_order_id=None)
+async def cancel_order(
+    order_id: str,
+    symbol: str = Query(default="QRLUSDT"),
+    exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory),
+):
+    """Cancel an existing order."""
+    usecase = CancelOrderUseCase(exchange_factory)
+    data = CancelOrderInput(symbol=symbol, order_id=order_id, client_order_id=None)
+    return await usecase.execute(data)
 
 
 @router.get("/orders/{order_id}")
-async def qrl_get_order(order_id: str):
-    usecase = GetQrlOrder(_client())
-    return await usecase.execute(order_id=order_id, client_order_id=None)
-
-
-@router.get("/summary")
-async def qrl_summary(
-    interval: str = Query(default="1m"),
-    kline_limit: int = Query(default=50, ge=1, le=500),
-    depth_limit: int = Query(default=50, ge=5, le=1000),
-    trades_limit: int = Query(default=50, ge=1, le=500),
+async def get_order(
+    order_id: str,
+    symbol: str = Query(default="QRLUSDT"),
+    exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory),
 ):
-    """Aggregate price, kline, depth, and balance for dashboard consumption."""
-    price_uc = GetQrlPrice(_client())
-    kline_uc = GetQrlKline(_client(), interval=interval, limit=kline_limit)
-    depth_uc = GetQrlDepth(_client(), limit=depth_limit)
-    balance_uc = GetBalanceUseCase()
-    orders_uc = ListOrdersUseCase()
-    trades_uc = ListTradesUseCase()
-    market_trades_uc = GetMarketTradesUseCase()
+    """Get order status."""
+    usecase = GetOrderUseCase(exchange_factory)
+    data = GetOrderInput(symbol=symbol, order_id=order_id, client_order_id=None)
+    return await usecase.execute(data)
 
-    price_result, kline_result, depth_result, balance_result, orders, trades, market_trades = await asyncio.gather(
-        price_uc.execute(),
-        kline_uc.execute(),
-        depth_uc.execute(),
-        balance_uc.execute(),
-        orders_uc.execute(symbol="QRLUSDT"),
-        trades_uc.execute("QRLUSDT"),
-        market_trades_uc.execute(),
-    )
 
-    normalized_klines = [
-        {"timestamp": item[0], "open": item[1], "high": item[2], "low": item[3], "close": item[4], "volume": item[5]}
-        for item in kline_result
-    ]
-    return {
-        "price": price_result.to_dict(),
-        "klines": normalized_klines,
-        "depth": depth_result,
-        "balance": balance_result,
-        "orders": orders,
-        "trades": trades,
-        "market_trades": market_trades[:trades_limit],
-    }
+@router.get("/orders")
+async def list_orders(
+    symbol: str = Query(default="QRLUSDT"),
+    exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory),
+):
+    """List recent orders."""
+    usecase = ListOrdersUseCase(exchange_factory)
+    return await usecase.execute(symbol=symbol)
+
+
+@router.get("/trades")
+async def list_trades(
+    symbol: str = Query(default="QRLUSDT"),
+    exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory),
+):
+    """List recent trades."""
+    usecase = ListTradesUseCase(exchange_factory)
+    return await usecase.execute(symbol)
+</file>
+
+<file path="src/app/interfaces/http/api/ws_routes.py">
+from fastapi import APIRouter, WebSocket
+
+from src.app.application.market.use_cases.get_ticker import GetTickerUseCase
+from src.app.application.trading.use_cases.list_orders import ListOrdersUseCase
+from src.app.interfaces.http.dependencies import build_exchange_factory
+
+router = APIRouter()
+
+
+@router.websocket("/market/ticker")
+async def ticker_stream(websocket: WebSocket):
+    """WebSocket ticker stream placeholder."""
+    await websocket.accept()
+    exchange_factory = build_exchange_factory()
+    usecase = GetTickerUseCase(exchange_factory)
+    await usecase.execute()  # TODO: stream data
+    await websocket.close()
+
+
+@router.websocket("/trading/orders")
+async def order_stream(websocket: WebSocket):
+    """WebSocket order stream placeholder."""
+    await websocket.accept()
+    exchange_factory = build_exchange_factory()
+    usecase = ListOrdersUseCase(exchange_factory)
+    await usecase.execute()  # TODO: stream data
+    await websocket.close()
+</file>
+
+<file path="src/app/interfaces/http/dependencies.py">
+"""FastAPI dependency providers for interface layer."""
+
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.infrastructure.exchange.mexc.service import build_mexc_exchange_service
+from src.app.infrastructure.exchange.mexc.settings import MexcSettings
+
+
+def build_exchange_factory(settings: MexcSettings | None = None) -> ExchangeServiceFactory:
+    """Return a factory that builds a fresh exchange adapter per request."""
+
+    def factory():
+        return build_mexc_exchange_service(settings or MexcSettings())
+
+    return factory
+
+
+def get_exchange_factory() -> ExchangeServiceFactory:
+    """Default dependency for constructing exchange adapters."""
+
+    return build_exchange_factory()
 </file>
 
 <file path="src/app/interfaces/http/pages/dashboard_routes.py">
@@ -4035,217 +3900,169 @@ async def dashboard(request: Request) -> HTMLResponse:
 })();
 </file>
 
-<file path="main.py">
-"""Entrypoint module for the FastAPI application."""
-
-import asyncio
-import os
-import sys
-from pathlib import Path
-
-try:
-    from dotenv import load_dotenv
-except ModuleNotFoundError:  # pragma: no cover - optional in production images
-    def load_dotenv() -> None:  # type: ignore
-        return None
-
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-import uvicorn
-
-# Ensure src is on sys.path when running `python main.py` directly (e.g., Cloud Run, local)
-ROOT = Path(__file__).parent
-SRC = ROOT / "src"
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
-if SRC.exists() and str(SRC) not in sys.path:
-    sys.path.append(str(SRC))
-
-from src.app.interfaces.http.api import account_routes, market_routes, system_routes, tasks_routes, trading_routes, ws_routes
-from src.app.interfaces.http.api import qrl_routes, trading_api
-from src.app.interfaces.http.pages import dashboard_routes
-from src.app.application.exchange.mexc_service import MexcService
-from src.app.infrastructure.exchange.mexc.rest_client import MexcRestClient
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
-
-load_dotenv()
-
-
-def create_app() -> FastAPI:
-    """Create and configure the FastAPI application."""
-    app = FastAPI(
-        title="QRL/USDT Trading Bot",
-        version="0.1.0",
-    )
-
-    static_dir = Path(__file__).parent / "src" / "app" / "interfaces" / "http" / "pages" / "static"
-    if static_dir.exists():
-        app.mount("/static", StaticFiles(directory=static_dir), name="static")
-
-    app.include_router(account_routes.router, prefix="/api/account", tags=["account"])
-    app.include_router(market_routes.router, prefix="/api/market", tags=["market"])
-    app.include_router(system_routes.router, prefix="/api/system", tags=["system"])
-    app.include_router(trading_routes.router, prefix="/api/trading", tags=["trading"])
-    app.include_router(qrl_routes.router, prefix="/api/qrl", tags=["qrl"])
-    app.include_router(trading_api.router, tags=["price"])
-    app.include_router(ws_routes.router, prefix="/ws", tags=["ws"])
-    app.include_router(tasks_routes.router, prefix="/tasks", tags=["tasks"])
-    app.include_router(tasks_routes.api_router, prefix="/api/tasks", tags=["tasks"])
-    app.include_router(dashboard_routes.router, tags=["pages"])
-    app.get("/", response_class=dashboard_routes.HTMLResponse)(dashboard_routes.dashboard)
-
-    @app.get("/health", tags=["system"])
-    async def health() -> dict[str, str]:
-        """Health check endpoint used by deployment probes."""
-        return {"status": "ok"}
-
-    return app
-
-
-app = create_app()
-
-
-async def _demo_mexc_usage() -> None:
-    """Demonstrate how to initialize the MexcService and call a simple API."""
-    try:
-        settings = MexcSettings()
-    except Exception as exc:  # pragma: no cover - demonstration only
-        print(f"[demo] Unable to load MEXC credentials: {exc}")
-        return
-
-    async with MexcService(MexcRestClient(settings)) as service:
-        server_time = await service.get_server_time()
-        print(f"[demo] MEXC server time: {server_time.value.isoformat()}")
-
-
-def _should_run_demo() -> bool:
-    """Gate demo execution behind an opt-in flag."""
-    return os.getenv("RUN_MEXC_DEMO", "0") == "1"
-
-
-def _run_server() -> None:
-    """Start the uvicorn server using environment configuration."""
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "8080"))
-    uvicorn.run(app, host=host, port=port, reload=False)
-
-
-if __name__ == "__main__":
-    if _should_run_demo():
-        asyncio.run(_demo_mexc_usage())
-    _run_server()
-
-__all__ = ["app"]
-</file>
-
-<file path="src/app/application/trading/use_cases/list_trades.py">
-"""Trading use case: list trades for QRL/USDT."""
-
-from src.app.application.exchange.mexc_service import MexcService, build_mexc_service
-from src.app.application.trading.dtos import TradeDTO
-from src.app.domain.entities.trade import Trade
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
-
-
-def _serialize_trade(trade: Trade) -> dict:
-    dto = TradeDTO(
-        trade_id=trade.trade_id.value,
-        order_id=trade.order_id.value,
-        symbol=trade.symbol.value,
-        side=trade.side.value,
-        price=str(trade.price.value),
-        quantity=str(trade.quantity.value),
-        fee=str(trade.fee) if trade.fee is not None else None,
-        fee_asset=trade.fee_asset,
-        timestamp=trade.timestamp.value.isoformat(),
-    )
-    return dto.to_dict()
-
-
-class ListTradesUseCase:
-    settings: MexcSettings | None = None
-
-    def __init__(self, settings: MexcSettings | None = None):
-        self.settings = settings
-
-    async def execute(self, symbol: str) -> list[dict]:
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            trades = await svc.list_trades(Symbol(symbol))
-        return [_serialize_trade(trade) for trade in trades]
-</file>
-
-<file path="src/app/application/trading/use_cases/place_order.py">
-"""Trading use case: place order for QRL/USDT."""
+<file path="src/app/application/account/use_cases/get_balance.py">
+"""Account use case: get subaccount balance with valuation."""
 
 from dataclasses import dataclass
 from decimal import Decimal
 
-from src.app.application.exchange.mexc_service import MexcService, PlaceOrderRequest, build_mexc_service
-from src.app.application.trading.dtos import OrderDTO
-from src.app.domain.entities.order import Order
-from src.app.domain.value_objects.order_type import OrderType
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.domain.entities.account import Account
+from src.app.domain.services.valuation_service import ValuationService
 from src.app.domain.value_objects.price import Price
-from src.app.domain.value_objects.quantity import Quantity
-from src.app.domain.value_objects.side import Side
 from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.time_in_force import TimeInForce
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
 
-def _serialize_order(order: Order) -> dict:
-    dto = OrderDTO(
-        order_id=order.order_id.value,
-        symbol=order.symbol.value,
-        side=order.side.value,
-        type=order.order_type.value,
-        status=order.status.value,
-        price=str(order.price.value) if order.price else None,
-        quantity=str(order.quantity.value),
-        executed_quantity=str(order.executed_quantity) if order.executed_quantity else None,
-        cumulative_quote_quantity=str(order.cumulative_quote_quantity)
-        if order.cumulative_quote_quantity
-        else None,
-        client_order_id=order.client_order_id,
-        created_at=order.created_at.value.isoformat(),
-        updated_at=order.updated_at.value.isoformat() if order.updated_at else None,
-        time_in_force=order.time_in_force.value if order.time_in_force else None,
-    )
-    return dto.to_dict()
+def _mid(price: Price) -> Decimal:
+    return (price.bid + price.ask) / Decimal("2")
+
+
+def _aggregate_balances(account: Account) -> dict:
+    usdt_free = usdt_locked = Decimal("0")
+    qrl_free = qrl_locked = Decimal("0")
+    for balance in account.balances:
+        asset = balance.asset.upper()
+        if asset == "USDT":
+            usdt_free += balance.free
+            usdt_locked += balance.locked
+        elif asset == "QRL":
+            qrl_free += balance.free
+            qrl_locked += balance.locked
+    return {
+        "usdt_free": usdt_free,
+        "usdt_locked": usdt_locked,
+        "qrl_free": qrl_free,
+        "qrl_locked": qrl_locked,
+    }
+
+
+def _valuation(agg: dict, mid_price: Decimal | None) -> dict:
+    usdt_total = agg["usdt_free"] + agg["usdt_locked"]
+    if mid_price is None:
+        return {
+            "price_available": False,
+            "price_mid": None,
+            "qrl_available_value": None,
+            "qrl_locked_value": None,
+            "qrl_value_usdt": None,
+            "total_value_usdt": None,
+            "qrl_pct": None,
+            "usdt_pct": None,
+        }
+
+    qrl_available_value = ValuationService.value(agg["qrl_free"], mid_price)
+    qrl_locked_value = ValuationService.value(agg["qrl_locked"], mid_price)
+    qrl_value = qrl_available_value + qrl_locked_value
+    total_value = qrl_value + usdt_total
+
+    if total_value > 0:
+        qrl_pct = (qrl_value / total_value) * Decimal("100")
+        usdt_pct = (usdt_total / total_value) * Decimal("100")
+    else:
+        qrl_pct = None
+        usdt_pct = None
+
+    return {
+        "price_available": True,
+        "price_mid": str(mid_price),
+        "qrl_available_value": str(qrl_available_value),
+        "qrl_locked_value": str(qrl_locked_value),
+        "qrl_value_usdt": str(qrl_value),
+        "total_value_usdt": str(total_value),
+        "qrl_pct": str(qrl_pct) if qrl_pct is not None else None,
+        "usdt_pct": str(usdt_pct) if usdt_pct is not None else None,
+    }
+
+
+def _serialize_account(account: Account, valuation: dict) -> dict:
+    return {
+        "can_trade": account.can_trade,
+        "update_time": account.update_time.value.isoformat(),
+        "balances": [
+            {
+                "asset": balance.asset,
+                "free": str(balance.free),
+                "locked": str(balance.locked),
+                "free_value_usdt": (
+                    valuation["qrl_available_value"] if balance.asset.upper() == "QRL" else None
+                ),
+                "locked_value_usdt": (
+                    valuation["qrl_locked_value"] if balance.asset.upper() == "QRL" else None
+                ),
+            }
+            for balance in account.balances
+        ],
+        "valuation": valuation,
+    }
 
 
 @dataclass
-class PlaceOrderInput:
-    symbol: str
-    side: str
-    quantity: Decimal
-    price: Decimal | None
-    order_type: str = "LIMIT"
-    time_in_force: str = "GTC"
-    client_order_id: str | None = None
+class GetBalanceUseCase:
+    exchange_factory: ExchangeServiceFactory
+
+    async def execute(self) -> dict:
+        async with self.exchange_factory() as exchange:
+            account = await exchange.get_account()
+            try:
+                price = await exchange.get_price(Symbol("QRLUSDT"))
+                mid = _mid(price)
+            except Exception:
+                price = None
+                mid = None
+
+        agg = _aggregate_balances(account)
+        valuation = _valuation(agg, mid)
+        return _serialize_account(account, valuation)
+</file>
+
+<file path="src/app/application/market/qrl/get_qrl_price.py">
+from dataclasses import asdict, dataclass
+from typing import Any
+
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.domain.value_objects.qrl_price import QrlPrice
+from src.app.domain.value_objects.qrl_usdt_pair import QrlUsdtPair
+from src.app.domain.value_objects.symbol import Symbol
 
 
-class PlaceOrderUseCase:
-    settings: MexcSettings | None = None
+@dataclass(frozen=True)
+class QrlPriceSnapshot:
+    bid: str | None
+    ask: str | None
+    last: str
+    timestamp: int | None
 
-    def __init__(self, settings: MexcSettings | None = None):
-        self.settings = settings
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
-    async def execute(self, data: PlaceOrderInput) -> dict:
-        request = PlaceOrderRequest(
-            symbol=Symbol(data.symbol),
-            side=Side(data.side),
-            order_type=OrderType(data.order_type),
-            quantity=Quantity(data.quantity),
-            price=Price.from_single(data.price) if data.price is not None else None,
-            time_in_force=TimeInForce(data.time_in_force) if data.time_in_force else None,
-            client_order_id=data.client_order_id,
+
+class GetQrlPrice:
+    """Fetch QRL/USDT price using the dedicated REST client."""
+
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self) -> QrlPriceSnapshot:
+        async with self._exchange_factory() as exchange:
+            ticker = await exchange.get_ticker_24h(Symbol(QrlUsdtPair.symbol()))
+        bid = ticker.get("bidPrice") or ticker.get("bid")
+        ask = ticker.get("askPrice") or ticker.get("ask")
+        last = ticker.get("lastPrice") or ticker.get("last")
+        if last is None:
+            raise ValueError("QRL price unavailable")
+        price_vo = QrlPrice(last)
+        timestamp = (
+            ticker.get("time")
+            or ticker.get("timestamp")
+            or ticker.get("closeTime")
+            or ticker.get("t")  # some SDKs return shorthand
         )
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            order = await svc.place_order(request)
-        return _serialize_order(order)
+        return QrlPriceSnapshot(
+            bid=str(bid) if bid is not None else None,
+            ask=str(ask) if ask is not None else None,
+            last=str(price_vo.value),
+            timestamp=timestamp,
+        )
 </file>
 
 <file path="src/app/domain/services/balance_comparison_rule.py">
@@ -4626,6 +4443,143 @@ class MexcSettings(BaseSettings):
         return cleaned
 </file>
 
+<file path="src/app/interfaces/http/api/qrl_routes.py">
+import asyncio
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from src.app.application.market.qrl.get_qrl_depth import GetQrlDepth
+from src.app.application.market.qrl.get_qrl_kline import GetQrlKline
+from src.app.application.market.qrl.get_qrl_price import GetQrlPrice
+from src.app.application.market.use_cases.get_market_trades import GetMarketTradesUseCase
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.application.trading.qrl.cancel_qrl_order import CancelQrlOrder
+from src.app.application.trading.qrl.get_qrl_order import GetQrlOrder
+from src.app.application.trading.qrl.place_qrl_order import PlaceQrlOrder
+from src.app.application.account.use_cases.get_balance import GetBalanceUseCase
+from src.app.application.trading.use_cases.list_orders import ListOrdersUseCase
+from src.app.application.trading.use_cases.list_trades import ListTradesUseCase
+from src.app.domain.value_objects.qrl_price import QrlPrice
+from src.app.domain.value_objects.qrl_quantity import QrlQuantity
+from src.app.interfaces.http.dependencies import get_exchange_factory
+from src.app.interfaces.http.schemas import PlaceOrderRequest
+
+router = APIRouter()
+
+
+@router.get("/price")
+async def qrl_price(exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)):
+    usecase = GetQrlPrice(exchange_factory)
+    try:
+        snapshot = await usecase.execute()
+        return snapshot.to_dict()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL price: {exc}") from exc
+
+
+@router.get("/kline")
+async def qrl_kline(
+    interval: str = Query(default="1m"),
+    limit: int = Query(default=50, ge=1, le=500),
+    exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory),
+):
+    usecase = GetQrlKline(exchange_factory, interval=interval, limit=limit)
+    try:
+        raw = await usecase.execute()
+        normalized = [
+            {"timestamp": item[0], "open": item[1], "high": item[2], "low": item[3], "close": item[4], "volume": item[5]}
+            for item in raw
+        ]
+        return normalized
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL klines: {exc}") from exc
+
+
+@router.get("/depth")
+async def qrl_depth(
+    limit: int = Query(default=50, ge=5, le=1000),
+    exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory),
+):
+    usecase = GetQrlDepth(exchange_factory, limit=limit)
+    try:
+        return await usecase.execute()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL depth: {exc}") from exc
+
+
+@router.post("/orders")
+async def qrl_place_order(
+    request: PlaceOrderRequest, exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)
+):
+    usecase = PlaceQrlOrder(exchange_factory)
+    price_vo = QrlPrice(request.price) if request.price is not None else None
+    qty_vo = QrlQuantity(request.quantity)
+    return await usecase.execute(
+        side=request.side,
+        order_type=request.order_type,
+        price=price_vo,
+        quantity=qty_vo,
+        time_in_force=request.time_in_force,
+        client_order_id=request.client_order_id,
+    )
+
+
+@router.post("/orders/{order_id}/cancel")
+async def qrl_cancel_order(
+    order_id: str, exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)
+):
+    usecase = CancelQrlOrder(exchange_factory)
+    return await usecase.execute(order_id=order_id, client_order_id=None)
+
+
+@router.get("/orders/{order_id}")
+async def qrl_get_order(order_id: str, exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)):
+    usecase = GetQrlOrder(exchange_factory)
+    return await usecase.execute(order_id=order_id, client_order_id=None)
+
+
+@router.get("/summary")
+async def qrl_summary(
+    interval: str = Query(default="1m"),
+    kline_limit: int = Query(default=50, ge=1, le=500),
+    depth_limit: int = Query(default=50, ge=5, le=1000),
+    trades_limit: int = Query(default=50, ge=1, le=500),
+    exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory),
+):
+    """Aggregate price, kline, depth, and balance for dashboard consumption."""
+    price_uc = GetQrlPrice(exchange_factory)
+    kline_uc = GetQrlKline(exchange_factory, interval=interval, limit=kline_limit)
+    depth_uc = GetQrlDepth(exchange_factory, limit=depth_limit)
+    balance_uc = GetBalanceUseCase(exchange_factory)
+    orders_uc = ListOrdersUseCase(exchange_factory)
+    trades_uc = ListTradesUseCase(exchange_factory)
+    market_trades_uc = GetMarketTradesUseCase(exchange_factory)
+
+    price_result, kline_result, depth_result, balance_result, orders, trades, market_trades = await asyncio.gather(
+        price_uc.execute(),
+        kline_uc.execute(),
+        depth_uc.execute(),
+        balance_uc.execute(),
+        orders_uc.execute(symbol="QRLUSDT"),
+        trades_uc.execute("QRLUSDT"),
+        market_trades_uc.execute(),
+    )
+
+    normalized_klines = [
+        {"timestamp": item[0], "open": item[1], "high": item[2], "low": item[3], "close": item[4], "volume": item[5]}
+        for item in kline_result
+    ]
+    return {
+        "price": price_result.to_dict(),
+        "klines": normalized_klines,
+        "depth": depth_result,
+        "balance": balance_result,
+        "orders": orders,
+        "trades": trades,
+        "market_trades": market_trades[:trades_limit],
+    }
+</file>
+
 <file path="src/app/interfaces/http/pages/static/js/domain/order.js">
 (() => {
   const cancelOrder = async (cfg, orderId) => {
@@ -4642,6 +4596,210 @@ class MexcSettings(BaseSettings):
 
   window.orderDomain = { cancelOrder };
 })();
+</file>
+
+<file path="main.py">
+"""Entrypoint module for the FastAPI application."""
+
+import asyncio
+import os
+import sys
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - optional in production images
+    def load_dotenv() -> None:  # type: ignore
+        return None
+
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+import uvicorn
+
+# Ensure src is on sys.path when running `python main.py` directly (e.g., Cloud Run, local)
+ROOT = Path(__file__).parent
+SRC = ROOT / "src"
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+if SRC.exists() and str(SRC) not in sys.path:
+    sys.path.append(str(SRC))
+
+from src.app.interfaces.http.api import account_routes, market_routes, system_routes, tasks_routes, trading_routes, ws_routes
+from src.app.interfaces.http.api import qrl_routes, trading_api
+from src.app.interfaces.http.pages import dashboard_routes
+from src.app.interfaces.http.dependencies import build_exchange_factory
+
+load_dotenv()
+
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title="QRL/USDT Trading Bot",
+        version="0.1.0",
+    )
+
+    static_dir = Path(__file__).parent / "src" / "app" / "interfaces" / "http" / "pages" / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+    app.include_router(account_routes.router, prefix="/api/account", tags=["account"])
+    app.include_router(market_routes.router, prefix="/api/market", tags=["market"])
+    app.include_router(system_routes.router, prefix="/api/system", tags=["system"])
+    app.include_router(trading_routes.router, prefix="/api/trading", tags=["trading"])
+    app.include_router(qrl_routes.router, prefix="/api/qrl", tags=["qrl"])
+    app.include_router(trading_api.router, tags=["price"])
+    app.include_router(ws_routes.router, prefix="/ws", tags=["ws"])
+    app.include_router(tasks_routes.router, prefix="/tasks", tags=["tasks"])
+    app.include_router(tasks_routes.api_router, prefix="/api/tasks", tags=["tasks"])
+    app.include_router(dashboard_routes.router, tags=["pages"])
+    app.get("/", response_class=dashboard_routes.HTMLResponse)(dashboard_routes.dashboard)
+
+    @app.get("/health", tags=["system"])
+    async def health() -> dict[str, str]:
+        """Health check endpoint used by deployment probes."""
+        return {"status": "ok"}
+
+    return app
+
+
+app = create_app()
+
+
+async def _demo_mexc_usage() -> None:
+    """Demonstrate how to initialize the MexcService and call a simple API."""
+    factory = build_exchange_factory()
+    try:
+        async with factory() as service:
+            server_time = await service.get_server_time()
+            print(f"[demo] MEXC server time: {server_time.value.isoformat()}")
+    except Exception as exc:  # pragma: no cover - demonstration only
+        print(f"[demo] Unable to load MEXC credentials: {exc}")
+
+
+def _should_run_demo() -> bool:
+    """Gate demo execution behind an opt-in flag."""
+    return os.getenv("RUN_MEXC_DEMO", "0") == "1"
+
+
+def _run_server() -> None:
+    """Start the uvicorn server using environment configuration."""
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8080"))
+    uvicorn.run(app, host=host, port=port, reload=False)
+
+
+if __name__ == "__main__":
+    if _should_run_demo():
+        asyncio.run(_demo_mexc_usage())
+    _run_server()
+
+__all__ = ["app"]
+</file>
+
+<file path="src/app/application/trading/use_cases/list_trades.py">
+"""Trading use case: list trades for QRL/USDT."""
+
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.application.trading.dtos import TradeDTO
+from src.app.domain.entities.trade import Trade
+from src.app.domain.value_objects.symbol import Symbol
+
+
+def _serialize_trade(trade: Trade) -> dict:
+    dto = TradeDTO(
+        trade_id=trade.trade_id.value,
+        order_id=trade.order_id.value,
+        symbol=trade.symbol.value,
+        side=trade.side.value,
+        price=str(trade.price.value),
+        quantity=str(trade.quantity.value),
+        fee=str(trade.fee) if trade.fee is not None else None,
+        fee_asset=trade.fee_asset,
+        timestamp=trade.timestamp.value.isoformat(),
+    )
+    return dto.to_dict()
+
+
+class ListTradesUseCase:
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self, symbol: str) -> list[dict]:
+        async with self._exchange_factory() as exchange:
+            trades = await exchange.list_trades(Symbol(symbol))
+        return [_serialize_trade(trade) for trade in trades]
+</file>
+
+<file path="src/app/application/trading/use_cases/place_order.py">
+"""Trading use case: place order for QRL/USDT."""
+
+from dataclasses import dataclass
+from decimal import Decimal
+
+from src.app.application.ports.exchange_service import (
+    ExchangeServiceFactory,
+    PlaceOrderRequest,
+)
+from src.app.application.trading.dtos import OrderDTO
+from src.app.domain.entities.order import Order
+from src.app.domain.value_objects.order_type import OrderType
+from src.app.domain.value_objects.price import Price
+from src.app.domain.value_objects.quantity import Quantity
+from src.app.domain.value_objects.side import Side
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.time_in_force import TimeInForce
+
+
+def _serialize_order(order: Order) -> dict:
+    dto = OrderDTO(
+        order_id=order.order_id.value,
+        symbol=order.symbol.value,
+        side=order.side.value,
+        type=order.order_type.value,
+        status=order.status.value,
+        price=str(order.price.value) if order.price else None,
+        quantity=str(order.quantity.value),
+        executed_quantity=str(order.executed_quantity) if order.executed_quantity else None,
+        cumulative_quote_quantity=str(order.cumulative_quote_quantity)
+        if order.cumulative_quote_quantity
+        else None,
+        client_order_id=order.client_order_id,
+        created_at=order.created_at.value.isoformat(),
+        updated_at=order.updated_at.value.isoformat() if order.updated_at else None,
+        time_in_force=order.time_in_force.value if order.time_in_force else None,
+    )
+    return dto.to_dict()
+
+
+@dataclass(frozen=True)
+class PlaceOrderInput:
+    symbol: str
+    side: str
+    quantity: Decimal
+    price: Decimal | None
+    order_type: str = "LIMIT"
+    time_in_force: str = "GTC"
+    client_order_id: str | None = None
+
+
+class PlaceOrderUseCase:
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self, data: PlaceOrderInput) -> dict:
+        request = PlaceOrderRequest(
+            symbol=Symbol(data.symbol),
+            side=Side(data.side),
+            order_type=OrderType(data.order_type),
+            quantity=Quantity(data.quantity),
+            price=Price.from_single(data.price) if data.price is not None else None,
+            time_in_force=TimeInForce(data.time_in_force) if data.time_in_force else None,
+            client_order_id=data.client_order_id,
+        )
+        async with self._exchange_factory() as exchange:
+            order = await exchange.place_order(request)
+        return _serialize_order(order)
 </file>
 
 <file path="src/app/infrastructure/exchange/mexc/mappers.py">
@@ -5058,31 +5216,6 @@ class AllocationResponse(BaseModel):
     )
 </file>
 
-<file path="src/app/interfaces/tasks/entrypoints.py">
-"""HTTP/Scheduler entrypoints for background tasks."""
-
-import asyncio
-import os
-
-from src.app.application.system.use_cases.allocation import AllocationResult, AllocationUseCase
-
-
-def _allocation_timeout_seconds() -> float:
-    """Read the scheduler task timeout from the environment."""
-    raw: str | None = os.getenv("TASK_TIMEOUT_SECONDS", "20")
-    try:
-        return float(raw)
-    except ValueError:
-        return 20.0
-
-
-async def run_allocation(timeout_seconds: float | None = None) -> AllocationResult:
-    """Trigger the allocation use case for Cloud Scheduler with a bounded runtime."""
-    usecase = AllocationUseCase()
-    timeout = timeout_seconds or _allocation_timeout_seconds()
-    return await asyncio.wait_for(usecase.execute(), timeout=timeout)
-</file>
-
 <file path="src/app/interfaces/http/pages/static/js/pages/dashboard.js">
 (() => {
   const cfg = window.dashboardConfig || {};
@@ -5210,6 +5343,33 @@ async def run_allocation(timeout_seconds: float | None = None) -> AllocationResu
 })();
 </file>
 
+<file path="src/app/interfaces/tasks/entrypoints.py">
+"""HTTP/Scheduler entrypoints for background tasks."""
+
+import asyncio
+import os
+
+from src.app.application.system.use_cases.allocation import AllocationResult, AllocationUseCase
+from src.app.interfaces.http.dependencies import build_exchange_factory
+
+
+def _allocation_timeout_seconds() -> float:
+    """Read the scheduler task timeout from the environment."""
+    raw: str | None = os.getenv("TASK_TIMEOUT_SECONDS", "20")
+    try:
+        return float(raw)
+    except ValueError:
+        return 20.0
+
+
+async def run_allocation(timeout_seconds: float | None = None) -> AllocationResult:
+    """Trigger the allocation use case for Cloud Scheduler with a bounded runtime."""
+    exchange_factory = build_exchange_factory()
+    usecase = AllocationUseCase(exchange_factory)
+    timeout = timeout_seconds or _allocation_timeout_seconds()
+    return await asyncio.wait_for(usecase.execute(), timeout=timeout)
+</file>
+
 <file path="src/app/interfaces/http/api/tasks_routes.py">
 import asyncio
 import logging
@@ -5271,10 +5431,12 @@ async def trigger_allocation_api() -> AllocationResponse:
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Callable
 from uuid import uuid4
 
-from src.app.application.exchange.mexc_service import MexcService, PlaceOrderRequest, build_mexc_service
+from src.app.application.ports.exchange_service import (
+    ExchangeServiceFactory,
+    PlaceOrderRequest,
+)
 from src.app.domain.entities.account import Account
 from src.app.domain.services.balance_comparison_rule import BalanceComparisonRule
 from src.app.domain.services.depth_calculator import DepthCalculator
@@ -5291,7 +5453,6 @@ from src.app.domain.value_objects.side import Side
 from src.app.domain.value_objects.slippage import SlippageAssessment
 from src.app.domain.value_objects.symbol import Symbol
 from src.app.domain.value_objects.time_in_force import TimeInForce
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
 
 class AllocationConfig:
@@ -5325,14 +5486,14 @@ class AllocationUseCase:
 
     def __init__(
         self,
-        service_factory: Callable[[], MexcService] | None = None,
+        exchange_factory: ExchangeServiceFactory,
         *,
         depth_limit: int = AllocationConfig.DEPTH_LIMIT,
         slippage_threshold_pct: Decimal = AllocationConfig.SLIPPAGE_THRESHOLD_PCT,
         target_quantity: Quantity | None = None,
         limit_price: Decimal = AllocationConfig.LIMIT_PRICE,
     ):
-        self._service_factory = service_factory or (lambda: build_mexc_service(MexcSettings()))
+        self._exchange_factory = exchange_factory
         self._comparison_rule = BalanceComparisonRule()
         self._depth_calculator = DepthCalculator()
         self._slippage_analyzer = SlippageAnalyzer(slippage_threshold_pct)
@@ -5345,7 +5506,7 @@ class AllocationUseCase:
         """Compare balances, evaluate depth/slippage, and submit a balancing order."""
         request_id = str(uuid4())
         executed_at = datetime.now(timezone.utc)
-        async with self._service_factory() as svc:
+        async with self._exchange_factory() as svc:
             account = await svc.get_account()
             try:
                 quote = await svc.get_price(AllocationConfig.SYMBOL)

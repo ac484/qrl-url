@@ -1,9 +1,10 @@
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
 from src.app.domain.value_objects.qrl_price import QrlPrice
 from src.app.domain.value_objects.qrl_usdt_pair import QrlUsdtPair
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
+from src.app.domain.value_objects.symbol import Symbol
 
 
 @dataclass(frozen=True)
@@ -20,12 +21,12 @@ class QrlPriceSnapshot:
 class GetQrlPrice:
     """Fetch QRL/USDT price using the dedicated REST client."""
 
-    def __init__(self, rest_client: QrlRestClient):
-        self._client = rest_client
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
 
     async def execute(self) -> QrlPriceSnapshot:
-        async with self._client as client:
-            ticker = await client.ticker_24h()
+        async with self._exchange_factory() as exchange:
+            ticker = await exchange.get_ticker_24h(Symbol(QrlUsdtPair.symbol()))
         bid = ticker.get("bidPrice") or ticker.get("bid")
         ask = ticker.get("askPrice") or ticker.get("ask")
         last = ticker.get("lastPrice") or ticker.get("last")
