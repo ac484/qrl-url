@@ -13,8 +13,6 @@ from src.app.application.trading.qrl.place_qrl_order import PlaceQrlOrder
 from src.app.application.account.use_cases.get_balance import GetBalanceUseCase
 from src.app.application.trading.use_cases.list_orders import ListOrdersUseCase
 from src.app.application.trading.use_cases.list_trades import ListTradesUseCase
-from src.app.domain.value_objects.qrl_price import QrlPrice
-from src.app.domain.value_objects.qrl_quantity import QrlQuantity
 from src.app.interfaces.http.dependencies import get_exchange_factory
 from src.app.interfaces.http.schemas import PlaceOrderRequest
 
@@ -66,13 +64,11 @@ async def qrl_place_order(
     request: PlaceOrderRequest, exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)
 ):
     usecase = PlaceQrlOrder(exchange_factory)
-    price_vo = QrlPrice(request.price) if request.price is not None else None
-    qty_vo = QrlQuantity(request.quantity)
     return await usecase.execute(
         side=request.side,
         order_type=request.order_type,
-        price=price_vo,
-        quantity=qty_vo,
+        price=request.price,
+        quantity=request.quantity,
         time_in_force=request.time_in_force,
         client_order_id=request.client_order_id,
     )
