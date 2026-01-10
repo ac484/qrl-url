@@ -2,3 +2,19 @@
 # Example:
 # *.log
 # tmp/
+
+.github/
+docs/
+
+*.md
+*.json
+*.txt
+
+Makefile
+
+.env.example
+.gitattributes
+.gitignore
+.repomixignore
+
+
