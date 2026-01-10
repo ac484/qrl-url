@@ -147,16 +147,20 @@ class AllocationUseCase:
 
 
 def _normalize_balances(account: Account, mid_price: Decimal, valuation: ValuationService) -> NormalizedBalances:
-    """Return normalized balances in value terms (USDT + QRL*mid_price)."""
-    qrl = Decimal("0")
-    usdt = Decimal("0")
+    """Return normalized balances in value terms, including locked amounts."""
+    qrl_free = qrl_locked = Decimal("0")
+    usdt_free = usdt_locked = Decimal("0")
     for bal in account.balances:
-        if bal.asset.upper() == "QRL":
-            qrl = bal.free
-        if bal.asset.upper() == "USDT":
-            usdt = bal.free
-    qrl_value = valuation.value(qrl, mid_price)
-    return NormalizedBalances(qrl_free=qrl_value, usdt_free=usdt)
+        asset = bal.asset.upper()
+        if asset == "QRL":
+            qrl_free += bal.free
+            qrl_locked += bal.locked
+        if asset == "USDT":
+            usdt_free += bal.free
+            usdt_locked += bal.locked
+    qrl_value = valuation.value(qrl_free + qrl_locked, mid_price)
+    usdt_total = usdt_free + usdt_locked
+    return NormalizedBalances(qrl_free=qrl_value, usdt_free=usdt_total)
 
 
 def _build_order_command(*, side: Side, quantity: Quantity, limit_price: Decimal) -> OrderCommand:

@@ -25,6 +25,8 @@ class FakeService:
         qrl_free: str,
         usdt_free: str,
         *,
+        qrl_locked: str = "0",
+        usdt_locked: str = "0",
         bids: list[DepthLevel] | None = None,
         asks: list[DepthLevel] | None = None,
         price_bid: str = "1",
@@ -32,6 +34,8 @@ class FakeService:
     ):
         self._qrl_free = Decimal(qrl_free)
         self._usdt_free = Decimal(usdt_free)
+        self._qrl_locked = Decimal(qrl_locked)
+        self._usdt_locked = Decimal(usdt_locked)
         self._book = OrderBook(bids=bids or [], asks=asks or [])
         self._price = Price(
             bid=Decimal(price_bid),
@@ -52,8 +56,8 @@ class FakeService:
             can_trade=True,
             update_time=Timestamp(datetime.now(timezone.utc)),
             balances=[
-                Balance(asset="QRL", free=self._qrl_free, locked=Decimal("0")),
-                Balance(asset="USDT", free=self._usdt_free, locked=Decimal("0")),
+                Balance(asset="QRL", free=self._qrl_free, locked=self._qrl_locked),
+                Balance(asset="USDT", free=self._usdt_free, locked=self._usdt_locked),
             ],
         )
 
@@ -88,6 +92,18 @@ async def test_allocation_skips_when_balances_even():
     assert result.status == "skipped"
     assert result.action == "SKIP"
     assert result.order_id is None
+    assert service.last_order_request is None
+
+
+@pytest.mark.asyncio
+async def test_allocation_counts_locked_balances_to_avoid_reorders():
+    service = FakeService(qrl_free="1", usdt_free="0", usdt_locked="1")
+    usecase = AllocationUseCase(service_factory=lambda: service)
+
+    result = await usecase.execute()
+
+    assert result.status == "skipped"
+    assert result.action == "SKIP"
     assert service.last_order_request is None
 
 
