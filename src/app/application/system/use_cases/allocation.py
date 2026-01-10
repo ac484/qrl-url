@@ -160,17 +160,24 @@ class AllocationUseCase:
             command = _build_order_command(
                 side=comparison.preferred_side, quantity=target_quantity, limit_price=limit_price
             )
-            order = await svc.place_order(
-                PlaceOrderRequest(
-                    symbol=command.symbol,
-                    side=command.side,
-                    order_type=OrderType("LIMIT"),
-                    quantity=command.quantity,
-                    price=command.price,
-                    time_in_force=command.time_in_force,
-                    client_order_id=request_id,
+            try:
+                order = await svc.place_order(
+                    PlaceOrderRequest(
+                        symbol=command.symbol,
+                        side=command.side,
+                        order_type=OrderType("LIMIT"),
+                        quantity=command.quantity,
+                        price=command.price,
+                        time_in_force=command.time_in_force,
+                        client_order_id=request_id,
+                    )
                 )
-            )
+            except HTTPStatusError as exc:
+                return _result_from_order_error(
+                    request_id=request_id,
+                    executed_at=executed_at,
+                    message=str(exc),
+                )
 
         return _result_from_success(
             request_id=request_id,
@@ -303,6 +310,19 @@ def _result_from_price_error(request_id: str, executed_at: datetime, *, detail: 
     )
 
 
+def _result_from_order_error(*, request_id: str, executed_at: datetime, message: str) -> AllocationResult:
+    return AllocationResult(
+        request_id=request_id,
+        status="rejected",
+        executed_at=executed_at,
+        action="REJECTED",
+        order_id=None,
+        reason=f"Order rejected: {message}",
+        slippage_pct=None,
+        expected_fill=None,
+    )
+
+
 def _result_from_success(
     *,
     request_id: str,
@@ -321,3 +341,4 @@ def _result_from_success(
         slippage_pct=slippage.slippage_pct,
         expected_fill=slippage.expected_fill,
     )
+from httpx import HTTPStatusError

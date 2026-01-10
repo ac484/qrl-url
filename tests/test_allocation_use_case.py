@@ -128,6 +128,34 @@ async def test_allocation_rounds_to_lot_size():
 
 
 @pytest.mark.asyncio
+async def test_allocation_rejects_on_order_http_error(monkeypatch):
+    service = FakeService(
+        qrl_free="2",
+        usdt_free="1",
+        bids=[DepthLevel(price=Decimal("1.01"), quantity=Decimal("2"))],
+        asks=[DepthLevel(price=Decimal("1.02"), quantity=Decimal("2"))],
+        price_bid="1.01",
+        price_ask="1.02",
+    )
+
+    class HttpError(Exception):
+        pass
+
+    async def raise_http_error(request):
+        from httpx import HTTPStatusError, Response, Request
+
+        raise HTTPStatusError("400", request=Request("POST", "http://test"), response=Response(400))
+
+    service.place_order = raise_http_error  # type: ignore
+    usecase = AllocationUseCase(service_factory=lambda: service)
+
+    result = await usecase.execute()
+
+    assert result.status == "rejected"
+    assert result.reason.startswith("Order rejected:")
+
+
+@pytest.mark.asyncio
 async def test_allocation_rejects_on_slippage():
     service = FakeService(
         qrl_free="0.1",
