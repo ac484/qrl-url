@@ -39,6 +39,8 @@ class AllocationConfig:
     SLIPPAGE_THRESHOLD_PCT = Decimal("5")
     PRICE_BUFFER_PCT = Decimal("0.001")  # 0.1%
     LIMIT_PRICE_CAP: Decimal | None = None
+    QUANTITY_STEP = Decimal("0.01")  # Exchange lot size step
+    PRICE_TICK = Decimal("0.0001")  # Exchange price tick
 
 
 @dataclass(frozen=True)
@@ -69,6 +71,8 @@ class AllocationUseCase:
         min_notional: Decimal = AllocationConfig.MIN_NOTIONAL,
         max_notional: Decimal = AllocationConfig.MAX_NOTIONAL,
         limit_price: Decimal | None = AllocationConfig.LIMIT_PRICE_CAP,
+        quantity_step: Decimal = AllocationConfig.QUANTITY_STEP,
+        price_tick: Decimal = AllocationConfig.PRICE_TICK,
     ):
         self._service_factory = service_factory or (lambda: build_mexc_service(MexcSettings()))
         self._comparison_rule = BalanceComparisonRule(target_ratio=target_ratio, tolerance_pct=tolerance_pct)
@@ -79,6 +83,8 @@ class AllocationUseCase:
         self._min_notional = Decimal(min_notional)
         self._max_notional = Decimal(max_notional)
         self._limit_price = Decimal(limit_price) if limit_price is not None else None
+        self._quantity_step = Decimal(quantity_step)
+        self._price_tick = Decimal(price_tick)
 
     async def execute(self) -> AllocationResult:
         """Compare balances, evaluate depth/slippage, and submit a balancing order."""
@@ -107,7 +113,14 @@ class AllocationUseCase:
                 )
 
             notional_to_trade = min(target_notional, self._max_notional)
-            target_quantity = Quantity(notional_to_trade / mid_price)
+            target_quantity = _apply_quantity_step(Quantity(notional_to_trade / mid_price), self._quantity_step)
+            if target_quantity.value <= 0:
+                return _result_from_skip(
+                    request_id,
+                    executed_at,
+                    comparison,
+                    reason="Quantity below lot size after rounding",
+                )
 
             order_book = await svc.get_depth(AllocationConfig.SYMBOL, limit=self._depth_limit)
             filled, weighted_price = self._depth_calculator.compute(
@@ -136,6 +149,7 @@ class AllocationUseCase:
                 best_ask=best_ask,
                 buffer_pct=AllocationConfig.PRICE_BUFFER_PCT,
                 limit_price_cap=self._limit_price,
+                price_tick=self._price_tick,
             )
             if limit_price is None:
                 return _result_from_slippage(
@@ -214,6 +228,7 @@ def _compute_limit_price(
     best_ask: Decimal,
     buffer_pct: Decimal,
     limit_price_cap: Decimal | None = None,
+    price_tick: Decimal | None = None,
 ) -> Decimal | None:
     """Return a maker-style limit price bounded by optional config."""
     if best_bid <= 0 or best_ask <= 0 or best_bid >= best_ask:
@@ -222,15 +237,27 @@ def _compute_limit_price(
         candidate = best_bid * (Decimal("1") - buffer_pct)
         if limit_price_cap is not None:
             candidate = min(candidate, limit_price_cap)
+        if price_tick:
+            candidate = candidate.quantize(price_tick)
         if candidate >= best_ask:
             return None
         return candidate
     candidate = best_ask * (Decimal("1") + buffer_pct)
     if limit_price_cap is not None:
         candidate = max(candidate, limit_price_cap)
+    if price_tick:
+        candidate = candidate.quantize(price_tick)
     if candidate <= best_bid:
         return None
     return candidate
+
+
+def _apply_quantity_step(quantity: Quantity, step: Decimal) -> Quantity:
+    """Round quantity down to exchange lot size step."""
+    if step <= 0:
+        return quantity
+    rounded = (quantity.value // step) * step
+    return Quantity(rounded) if rounded > 0 else Quantity(step * 0)
 
 
 def _result_from_skip(

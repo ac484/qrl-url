@@ -109,6 +109,25 @@ async def test_allocation_counts_locked_balances():
 
 
 @pytest.mark.asyncio
+async def test_allocation_rounds_to_lot_size():
+    service = FakeService(
+        qrl_free="5",
+        usdt_free="0",
+        bids=[DepthLevel(price=Decimal("1.01"), quantity=Decimal("10"))],
+        asks=[DepthLevel(price=Decimal("1.02"), quantity=Decimal("10"))],
+        price_bid="1.01",
+        price_ask="1.02",
+    )
+    usecase = AllocationUseCase(service_factory=lambda: service, quantity_step=Decimal("0.1"))
+
+    result = await usecase.execute()
+
+    assert result.status == "ok"
+    assert result.expected_fill % Decimal("0.1") == Decimal("0")
+    assert service.last_order_request.quantity.value % Decimal("0.1") == Decimal("0")
+
+
+@pytest.mark.asyncio
 async def test_allocation_rejects_on_slippage():
     service = FakeService(
         qrl_free="0.1",
@@ -146,12 +165,12 @@ async def test_allocation_places_order_when_slippage_ok():
     assert result.status == "ok"
     assert result.action == "SELL"
     assert result.order_id == "test-order"
-    assert result.expected_fill.quantize(Decimal("0.00000001")) == Decimal("0.50738916")
+    assert result.expected_fill == Decimal("0.50")
     assert service.last_order_request is not None
     assert service.last_order_request.side.value == "SELL"
     assert service.last_order_request.price is not None
-    assert service.last_order_request.price.last == Decimal("1.02102")
-    assert service.last_order_request.quantity.value.quantize(Decimal("0.00000001")) == Decimal("0.50738916")
+    assert service.last_order_request.price.last == Decimal("1.0210")
+    assert service.last_order_request.quantity.value == Decimal("0.50")
     assert service.last_order_request.time_in_force == TimeInForce("GTC")
 
 
