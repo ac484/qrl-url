@@ -866,6 +866,89 @@ class ListOrdersUseCase:
 """Domain layer root."""
 </file>
 
+<file path="src/app/domain/aggregates/__init__.py">
+"""Domain aggregates for the QRL/USDT trading context."""
+
+from src.app.domain.aggregates.account_state import AccountState
+from src.app.domain.aggregates.market_snapshot import MarketSnapshot
+from src.app.domain.aggregates.trading_session import TradingSession
+
+__all__ = ["AccountState", "MarketSnapshot", "TradingSession"]
+</file>
+
+<file path="src/app/domain/aggregates/account_state.py">
+from dataclasses import dataclass, field
+
+from src.app.domain.entities.account import Account
+from src.app.domain.entities.order import Order
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.timestamp import Timestamp
+
+
+@dataclass
+class AccountState:
+    """Aggregate for account balances and outstanding orders."""
+
+    symbol: Symbol
+    account: Account
+    open_orders: list[Order] = field(default_factory=list)
+    updated_at: Timestamp | None = None
+</file>
+
+<file path="src/app/domain/aggregates/market_snapshot.py">
+from dataclasses import dataclass, field
+
+from src.app.domain.entities.order_book_level import OrderBookLevel
+from src.app.domain.entities.trade import Trade
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.ticker import Ticker
+from src.app.domain.value_objects.timestamp import Timestamp
+
+
+@dataclass
+class MarketSnapshot:
+    """Combined market view for depth, trades, and ticker."""
+
+    symbol: Symbol
+    bids: list[OrderBookLevel] = field(default_factory=list)
+    asks: list[OrderBookLevel] = field(default_factory=list)
+    trades: list[Trade] = field(default_factory=list)
+    ticker: Ticker | None = None
+    updated_at: Timestamp | None = None
+</file>
+
+<file path="src/app/domain/aggregates/trading_session.py">
+from dataclasses import dataclass, field
+
+from src.app.domain.entities.order import Order
+from src.app.domain.entities.trade import Trade
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.timestamp import Timestamp
+
+
+@dataclass
+class TradingSession:
+    """Session-level aggregate for managing open and historical activity."""
+
+    symbol: Symbol
+    open_orders: list[Order] = field(default_factory=list)
+    trades: list[Trade] = field(default_factory=list)
+    started_at: Timestamp | None = None
+    last_activity_at: Timestamp | None = None
+</file>
+
+<file path="src/app/domain/entities/__init__.py">
+"""Domain entities for QRL/USDT spot trading."""
+
+from src.app.domain.entities.account import Account
+from src.app.domain.entities.kline import Kline
+from src.app.domain.entities.order import Order
+from src.app.domain.entities.order_book_level import OrderBookLevel
+from src.app.domain.entities.trade import Trade
+
+__all__ = ["Account", "Kline", "Order", "OrderBookLevel", "Trade"]
+</file>
+
 <file path="src/app/domain/entities/account.py">
 from dataclasses import dataclass
 from src.app.domain.value_objects.balance import Balance
@@ -879,6 +962,46 @@ class Account:
     can_trade: bool
     update_time: Timestamp
     balances: list[Balance]
+</file>
+
+<file path="src/app/domain/entities/kline.py">
+from dataclasses import dataclass
+from decimal import Decimal
+
+from src.app.domain.value_objects.kline_interval import KlineInterval
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.timestamp import Timestamp
+
+
+@dataclass
+class Kline:
+    """Kline entity for QRL/USDT spot."""
+
+    symbol: Symbol
+    interval: KlineInterval
+    open: Decimal
+    high: Decimal
+    low: Decimal
+    close: Decimal
+    volume: Decimal
+    open_time: Timestamp
+    close_time: Timestamp | None = None
+</file>
+
+<file path="src/app/domain/entities/order_book_level.py">
+from dataclasses import dataclass
+from decimal import Decimal
+
+from src.app.domain.value_objects.order_side import OrderSide
+
+
+@dataclass
+class OrderBookLevel:
+    """Single depth level for the QRL/USDT order book."""
+
+    price: Decimal
+    quantity: Decimal
+    side: OrderSide
 </file>
 
 <file path="src/app/domain/entities/trading_pair.py">
@@ -982,6 +1105,40 @@ class TradeEvent:
     timestamp: int
 </file>
 
+<file path="src/app/domain/value_objects/__init__.py">
+"""Domain Value Objects for QRL/USDT scope."""
+
+from src.app.domain.value_objects.order_id import OrderId
+from src.app.domain.value_objects.kline_interval import KlineInterval
+from src.app.domain.value_objects.order_side import OrderSide
+from src.app.domain.value_objects.order_status import OrderStatus
+from src.app.domain.value_objects.price import Price
+from src.app.domain.value_objects.quantity import Quantity
+from src.app.domain.value_objects.side import Side
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.ticker import Ticker
+from src.app.domain.value_objects.timestamp import Timestamp
+from src.app.domain.value_objects.trade_id import TradeId
+from src.app.domain.value_objects.kline import KLine
+from src.app.domain.value_objects.sub_account_id import SubAccountId
+
+__all__ = [
+    "OrderId",
+    "OrderStatus",
+    "OrderSide",
+    "KlineInterval",
+    "Price",
+    "KLine",
+    "Quantity",
+    "Side",
+    "Symbol",
+    "Ticker",
+    "Timestamp",
+    "TradeId",
+    "SubAccountId",
+]
+</file>
+
 <file path="src/app/domain/value_objects/api_key.py">
 from dataclasses import dataclass
 
@@ -1049,6 +1206,31 @@ class ClientOrderId:
             raise ValueError("Client order id must be 32 characters or fewer")
 </file>
 
+<file path="src/app/domain/value_objects/kline_interval.py">
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class KlineInterval:
+    """Supported MEXC spot kline intervals for QRL/USDT."""
+
+    value: str
+
+    _allowed = {
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "4h",
+        "1d",
+    }
+
+    def __post_init__(self):
+        if self.value not in self._allowed:
+            raise ValueError(f"KlineInterval must be one of {sorted(self._allowed)}")
+</file>
+
 <file path="src/app/domain/value_objects/kline.py">
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -1105,6 +1287,14 @@ class OrderId:
     def __post_init__(self):
         if not self.value:
             raise ValueError("OrderId cannot be empty")
+</file>
+
+<file path="src/app/domain/value_objects/order_side.py">
+from src.app.domain.value_objects.side import Side
+
+
+class OrderSide(Side):
+    """Alias for Side specific to order semantics."""
 </file>
 
 <file path="src/app/domain/value_objects/order_status.py">
@@ -2470,6 +2660,57 @@ async def get_balance():
         raise HTTPException(status_code=502, detail=f"Failed to fetch balance: {exc}") from exc
 </file>
 
+<file path="src/app/interfaces/http/api/market_routes.py">
+from fastapi import APIRouter, Query
+
+from src.app.application.market.use_cases.get_depth import GetDepthUseCase
+from src.app.application.market.use_cases.get_kline import GetKlineUseCase
+from src.app.application.market.use_cases.get_market_trades import GetMarketTradesInput, GetMarketTradesUseCase
+from src.app.application.market.use_cases.get_stats24h import GetStats24hUseCase
+from src.app.application.market.use_cases.get_ticker import GetTickerUseCase
+
+router = APIRouter()
+
+
+@router.get("/depth")
+async def get_depth(limit: int = Query(default=50, ge=5, le=1000)):
+    """Get order book depth for QRL/USDT."""
+    usecase = GetDepthUseCase()
+    from src.app.application.market.use_cases.get_depth import GetDepthInput
+
+    return await usecase.execute(data=GetDepthInput(limit=limit))
+
+
+@router.get("/ticker")
+async def get_ticker():
+    """Get ticker for QRL/USDT."""
+    usecase = GetTickerUseCase()
+    return await usecase.execute()
+
+
+@router.get("/kline")
+async def get_kline(interval: str = Query(default="1m"), limit: int = Query(default=50, ge=1, le=500)):
+    """Get kline data for QRL/USDT."""
+    usecase = GetKlineUseCase()
+    from src.app.application.market.use_cases.get_kline import GetKlineInput
+
+    return await usecase.execute(data=GetKlineInput(interval=interval, limit=limit))
+
+
+@router.get("/stats24h")
+async def get_stats_24h():
+    """Get 24h statistics for QRL/USDT."""
+    usecase = GetStats24hUseCase()
+    return await usecase.execute()
+
+
+@router.get("/trades")
+async def get_market_trades(limit: int = Query(default=50, ge=1, le=500)):
+    """Get recent public trades for QRL/USDT."""
+    usecase = GetMarketTradesUseCase()
+    return await usecase.execute(data=GetMarketTradesInput(limit=limit))
+</file>
+
 <file path="src/app/interfaces/http/api/system_routes.py">
 from fastapi import APIRouter
 
@@ -3006,129 +3247,6 @@ class TradeDTO:
         return asdict(self)
 </file>
 
-<file path="src/app/domain/aggregates/__init__.py">
-"""Domain aggregates for the QRL/USDT trading context."""
-
-from src.app.domain.aggregates.account_state import AccountState
-from src.app.domain.aggregates.market_snapshot import MarketSnapshot
-from src.app.domain.aggregates.trading_session import TradingSession
-
-__all__ = ["AccountState", "MarketSnapshot", "TradingSession"]
-</file>
-
-<file path="src/app/domain/aggregates/account_state.py">
-from dataclasses import dataclass, field
-
-from src.app.domain.entities.account import Account
-from src.app.domain.entities.order import Order
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.timestamp import Timestamp
-
-
-@dataclass
-class AccountState:
-    """Aggregate for account balances and outstanding orders."""
-
-    symbol: Symbol
-    account: Account
-    open_orders: list[Order] = field(default_factory=list)
-    updated_at: Timestamp | None = None
-</file>
-
-<file path="src/app/domain/aggregates/market_snapshot.py">
-from dataclasses import dataclass, field
-
-from src.app.domain.entities.order_book_level import OrderBookLevel
-from src.app.domain.entities.trade import Trade
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.ticker import Ticker
-from src.app.domain.value_objects.timestamp import Timestamp
-
-
-@dataclass
-class MarketSnapshot:
-    """Combined market view for depth, trades, and ticker."""
-
-    symbol: Symbol
-    bids: list[OrderBookLevel] = field(default_factory=list)
-    asks: list[OrderBookLevel] = field(default_factory=list)
-    trades: list[Trade] = field(default_factory=list)
-    ticker: Ticker | None = None
-    updated_at: Timestamp | None = None
-</file>
-
-<file path="src/app/domain/aggregates/trading_session.py">
-from dataclasses import dataclass, field
-
-from src.app.domain.entities.order import Order
-from src.app.domain.entities.trade import Trade
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.timestamp import Timestamp
-
-
-@dataclass
-class TradingSession:
-    """Session-level aggregate for managing open and historical activity."""
-
-    symbol: Symbol
-    open_orders: list[Order] = field(default_factory=list)
-    trades: list[Trade] = field(default_factory=list)
-    started_at: Timestamp | None = None
-    last_activity_at: Timestamp | None = None
-</file>
-
-<file path="src/app/domain/entities/__init__.py">
-"""Domain entities for QRL/USDT spot trading."""
-
-from src.app.domain.entities.account import Account
-from src.app.domain.entities.kline import Kline
-from src.app.domain.entities.order import Order
-from src.app.domain.entities.order_book_level import OrderBookLevel
-from src.app.domain.entities.trade import Trade
-
-__all__ = ["Account", "Kline", "Order", "OrderBookLevel", "Trade"]
-</file>
-
-<file path="src/app/domain/entities/kline.py">
-from dataclasses import dataclass
-from decimal import Decimal
-
-from src.app.domain.value_objects.kline_interval import KlineInterval
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.timestamp import Timestamp
-
-
-@dataclass
-class Kline:
-    """Kline entity for QRL/USDT spot."""
-
-    symbol: Symbol
-    interval: KlineInterval
-    open: Decimal
-    high: Decimal
-    low: Decimal
-    close: Decimal
-    volume: Decimal
-    open_time: Timestamp
-    close_time: Timestamp | None = None
-</file>
-
-<file path="src/app/domain/entities/order_book_level.py">
-from dataclasses import dataclass
-from decimal import Decimal
-
-from src.app.domain.value_objects.order_side import OrderSide
-
-
-@dataclass
-class OrderBookLevel:
-    """Single depth level for the QRL/USDT order book."""
-
-    price: Decimal
-    quantity: Decimal
-    side: OrderSide
-</file>
-
 <file path="src/app/domain/entities/order.py">
 from dataclasses import dataclass
 from datetime import datetime
@@ -3290,40 +3408,6 @@ class ValuationService:
         return quantity * unit_price
 </file>
 
-<file path="src/app/domain/value_objects/__init__.py">
-"""Domain Value Objects for QRL/USDT scope."""
-
-from src.app.domain.value_objects.order_id import OrderId
-from src.app.domain.value_objects.kline_interval import KlineInterval
-from src.app.domain.value_objects.order_side import OrderSide
-from src.app.domain.value_objects.order_status import OrderStatus
-from src.app.domain.value_objects.price import Price
-from src.app.domain.value_objects.quantity import Quantity
-from src.app.domain.value_objects.side import Side
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.ticker import Ticker
-from src.app.domain.value_objects.timestamp import Timestamp
-from src.app.domain.value_objects.trade_id import TradeId
-from src.app.domain.value_objects.kline import KLine
-from src.app.domain.value_objects.sub_account_id import SubAccountId
-
-__all__ = [
-    "OrderId",
-    "OrderStatus",
-    "OrderSide",
-    "KlineInterval",
-    "Price",
-    "KLine",
-    "Quantity",
-    "Side",
-    "Symbol",
-    "Ticker",
-    "Timestamp",
-    "TradeId",
-    "SubAccountId",
-]
-</file>
-
 <file path="src/app/domain/value_objects/balance_comparison_result.py">
 from dataclasses import dataclass
 from decimal import Decimal
@@ -3341,31 +3425,6 @@ class BalanceComparisonResult:
     action: str
     preferred_side: Side | None
     reason: str | None = None
-</file>
-
-<file path="src/app/domain/value_objects/kline_interval.py">
-from dataclasses import dataclass
-
-
-@dataclass(frozen=True)
-class KlineInterval:
-    """Supported MEXC spot kline intervals for QRL/USDT."""
-
-    value: str
-
-    _allowed = {
-        "1m",
-        "5m",
-        "15m",
-        "30m",
-        "1h",
-        "4h",
-        "1d",
-    }
-
-    def __post_init__(self):
-        if self.value not in self._allowed:
-            raise ValueError(f"KlineInterval must be one of {sorted(self._allowed)}")
 </file>
 
 <file path="src/app/domain/value_objects/normalized_balances.py">
@@ -3406,14 +3465,6 @@ class OrderCommand:
     time_in_force: TimeInForce
 </file>
 
-<file path="src/app/domain/value_objects/order_side.py">
-from src.app.domain.value_objects.side import Side
-
-
-class OrderSide(Side):
-    """Alias for Side specific to order semantics."""
-</file>
-
 <file path="src/app/domain/value_objects/slippage.py">
 from dataclasses import dataclass
 from decimal import Decimal
@@ -3427,6 +3478,242 @@ class SlippageAssessment:
     slippage_pct: Decimal
     is_acceptable: bool
     reason: str | None = None
+</file>
+
+<file path="src/app/infrastructure/exchange/mexc/factories.py">
+"""
+Factories to translate MEXC REST/WebSocket DTOs into domain aggregates.
+
+These implementations are intentionally lightweight placeholders. They ensure
+that aggregate construction paths are present and wired, while allowing the
+future work to enrich the mapping with full business rules.
+"""
+
+from datetime import datetime, timezone
+from decimal import Decimal
+from typing import Iterable, Optional
+
+from src.app.domain.aggregates.account_state import AccountState
+from src.app.domain.aggregates.market_snapshot import MarketSnapshot
+from src.app.domain.aggregates.trading_session import TradingSession
+from src.app.domain.factories.aggregates import (
+    build_account_state,
+    build_market_snapshot,
+    build_trading_session,
+)
+from src.app.domain.entities.account import Account
+from src.app.domain.entities.kline import Kline
+from src.app.domain.entities.order import Order
+from src.app.domain.entities.order_book_level import OrderBookLevel
+from src.app.domain.entities.trade import Trade
+from src.app.domain.value_objects.balance import Balance
+from src.app.domain.value_objects.kline_interval import KlineInterval
+from src.app.domain.value_objects.order_id import OrderId
+from src.app.domain.value_objects.order_side import OrderSide
+from src.app.domain.value_objects.order_type import OrderType
+from src.app.domain.value_objects.order_status import OrderStatus
+from src.app.domain.value_objects.quantity import Quantity
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.ticker import Ticker
+from src.app.domain.value_objects.timestamp import Timestamp
+from src.app.domain.value_objects.trade_id import TradeId
+from src.app.infrastructure.exchange.mexc.generated import (
+    PrivateAccountV3Api_pb2,
+    PrivateOrdersV3Api_pb2,
+    PublicAggreDepthsV3Api_pb2,
+    PublicAggreDealsV3Api_pb2,
+    PublicBookTickerV3Api_pb2,
+    PublicSpotKlineV3Api_pb2,
+)
+
+
+def _default_timestamp() -> Timestamp:
+    return Timestamp(datetime.now(timezone.utc))
+
+
+def _levels_from_depth(
+    depth: Optional[PublicAggreDepthsV3Api_pb2.PublicAggreDepthsV3Api],
+) -> tuple[list[OrderBookLevel], list[OrderBookLevel]]:
+    if depth is None:
+        return [], []
+
+    bids = [
+        OrderBookLevel(
+            price=Decimal(str(item.price)),
+            quantity=Decimal(str(item.quantity)),
+            side=OrderSide("BUY"),
+        )
+        for item in getattr(depth, "bids", [])  # type: ignore[attr-defined]
+    ]
+    asks = [
+        OrderBookLevel(
+            price=Decimal(str(item.price)),
+            quantity=Decimal(str(item.quantity)),
+            side=OrderSide("SELL"),
+        )
+        for item in getattr(depth, "asks", [])  # type: ignore[attr-defined]
+    ]
+    return bids, asks
+
+
+def market_snapshot_from_sources(
+    symbol: Symbol,
+    depth_proto: Optional[PublicAggreDepthsV3Api_pb2.PublicAggreDepthsV3Api] = None,
+    trades: Optional[Iterable[Trade]] = None,
+    ticker_proto: Optional[PublicBookTickerV3Api_pb2.PublicBookTickerV3Api] = None,
+) -> MarketSnapshot:
+    """
+    Build a MarketSnapshot aggregate from available feed DTOs.
+
+    The function accepts partial data (depth only, depth + trades, etc.) so
+    the callers can incrementally enrich the snapshot.
+    """
+
+    bids, asks = _levels_from_depth(depth_proto)
+    ticker: Ticker | None = None
+    if ticker_proto is not None:
+        bid = Decimal(str(getattr(ticker_proto, "bidPrice", 0)))
+        ask = Decimal(str(getattr(ticker_proto, "askPrice", 0)))
+        last = Decimal(str(getattr(ticker_proto, "lastPrice", 0)))
+        if bid > 0 and ask > 0 and last > 0:
+            ticker = Ticker(
+                symbol=symbol,
+                last_price=last,
+                bid_price=bid,
+                ask_price=ask,
+                ts=_default_timestamp().value,
+            )
+
+    return build_market_snapshot(
+        symbol=symbol,
+        bids=bids,
+        asks=asks,
+        trades=list(trades or []),
+        ticker=ticker,
+    )
+
+
+def account_state_from_proto(
+    symbol: Symbol, account_proto: PrivateAccountV3Api_pb2.PrivateAccountV3Api
+) -> AccountState:
+    """
+    Translate private account snapshot DTO into AccountState aggregate.
+
+    Balance parsing is intentionally minimal; further normalization can be
+    implemented when business rules are ready.
+    """
+
+    balances: list[Balance] = []
+    for item in getattr(account_proto, "balances", []):  # type: ignore[attr-defined]
+        balances.append(
+            Balance(
+                asset=getattr(item, "asset", ""),
+                free=Decimal(str(getattr(item, "free", 0))),
+                locked=Decimal(str(getattr(item, "locked", 0))),
+            )
+        )
+
+    account = Account(
+        can_trade=bool(getattr(account_proto, "canTrade", True)),
+        update_time=_default_timestamp(),
+        balances=balances,
+    )
+    return build_account_state(symbol=symbol, account=account, open_orders=[])
+
+
+def trading_session_from_orders(
+    symbol: Symbol, orders: Optional[Iterable[Order]] = None, trades: Optional[Iterable[Trade]] = None
+) -> TradingSession:
+    """Create a TradingSession aggregate from existing order/trade records."""
+
+    return build_trading_session(symbol=symbol, orders=orders or [], trades=trades or [])
+
+
+def trades_from_public_proto(
+    symbol: Symbol, deals_proto: Optional[PublicAggreDealsV3Api_pb2.PublicAggreDealsV3Api] = None
+) -> list[Trade]:
+    """Convert public trades DTO to domain trades (skeleton mapping)."""
+
+    if deals_proto is None:
+        return []
+
+    trades: list[Trade] = []
+    for item in getattr(deals_proto, "deals", []):  # type: ignore[attr-defined]
+        trade_id_str = str(getattr(item, "tradeId", "0"))
+        order_id_str = str(getattr(item, "orderId", "0"))
+        trades.append(
+            Trade(
+                trade_id=TradeId(trade_id_str),
+                order_id=OrderId(order_id_str),
+                symbol=symbol,
+                side=OrderSide("BUY") if bool(getattr(item, "isBuyerMaker", False)) else OrderSide("SELL"),
+                price=Decimal(str(getattr(item, "price", 0))),
+                quantity=Decimal(str(getattr(item, "quantity", 0))),
+                fee=None,
+                fee_asset=None,
+                timestamp=_default_timestamp(),
+            )
+        )
+    return trades
+
+
+def klines_from_proto(
+    symbol: Symbol, kline_proto: Optional[PublicSpotKlineV3Api_pb2.PublicSpotKlineV3Api] = None
+) -> list[Kline]:
+    """Convert spot kline DTOs to domain klines (skeleton mapping)."""
+
+    if kline_proto is None:
+        return []
+
+    klines: list[Kline] = []
+    interval = KlineInterval(str(getattr(kline_proto, "interval", "1m")))
+    for item in getattr(kline_proto, "klineList", []):  # type: ignore[attr-defined]
+        open_time_ms = int(getattr(item, "openTime", 0))
+        close_time_ms = int(getattr(item, "closeTime", 0))
+        klines.append(
+            Kline(
+                symbol=symbol,
+                interval=interval,
+                open=Decimal(str(getattr(item, "open", 0))),
+                high=Decimal(str(getattr(item, "high", 0))),
+                low=Decimal(str(getattr(item, "low", 0))),
+                close=Decimal(str(getattr(item, "close", 0))),
+                volume=Decimal(str(getattr(item, "volume", 0))),
+                open_time=Timestamp(datetime.fromtimestamp(open_time_ms / 1000, tz=timezone.utc)),
+                close_time=Timestamp(datetime.fromtimestamp(close_time_ms / 1000, tz=timezone.utc)),
+            )
+        )
+    return klines
+
+
+def orders_from_private_proto(
+    symbol: Symbol, orders_proto: Optional[PrivateOrdersV3Api_pb2.PrivateOrdersV3Api] = None
+) -> list[Order]:
+    """Convert private orders DTO to domain orders (skeleton mapping)."""
+
+    if orders_proto is None:
+        return []
+
+    orders: list[Order] = []
+    for item in getattr(orders_proto, "orders", []):  # type: ignore[attr-defined]
+        orders.append(
+            Order(
+                order_id=OrderId(str(getattr(item, "orderId", ""))),
+                symbol=symbol,
+                side=OrderSide(str(getattr(item, "side", "BUY"))),
+                order_type=OrderType(str(getattr(item, "type", "LIMIT"))),
+                status=OrderStatus(str(getattr(item, "status", "NEW"))),
+                price=Decimal(str(getattr(item, "price", 0))),
+                quantity=Quantity(Decimal(str(getattr(item, "origQty", 0)))),
+                created_at=_default_timestamp(),
+                time_in_force=None,
+                client_order_id=str(getattr(item, "clientOrderId", "")) if getattr(item, "clientOrderId", None) else None,
+                executed_quantity=Decimal(str(getattr(item, "executedQty", 0))),
+                cumulative_quote_quantity=Decimal(str(getattr(item, "cummulativeQuoteQty", 0))),
+                updated_at=_default_timestamp(),
+            )
+        )
+    return orders
 </file>
 
 <file path="src/app/infrastructure/exchange/mexc/qrl/qrl_rest_client.py">
@@ -3490,57 +3777,6 @@ class QrlRestClient:
         return await self._client.cancel_order(
             symbol=QrlUsdtPair.symbol(), order_id=order_id, client_order_id=client_order_id
         )
-</file>
-
-<file path="src/app/interfaces/http/api/market_routes.py">
-from fastapi import APIRouter, Query
-
-from src.app.application.market.use_cases.get_depth import GetDepthUseCase
-from src.app.application.market.use_cases.get_kline import GetKlineUseCase
-from src.app.application.market.use_cases.get_market_trades import GetMarketTradesInput, GetMarketTradesUseCase
-from src.app.application.market.use_cases.get_stats24h import GetStats24hUseCase
-from src.app.application.market.use_cases.get_ticker import GetTickerUseCase
-
-router = APIRouter()
-
-
-@router.get("/depth")
-async def get_depth(limit: int = Query(default=50, ge=5, le=1000)):
-    """Get order book depth for QRL/USDT."""
-    usecase = GetDepthUseCase()
-    from src.app.application.market.use_cases.get_depth import GetDepthInput
-
-    return await usecase.execute(data=GetDepthInput(limit=limit))
-
-
-@router.get("/ticker")
-async def get_ticker():
-    """Get ticker for QRL/USDT."""
-    usecase = GetTickerUseCase()
-    return await usecase.execute()
-
-
-@router.get("/kline")
-async def get_kline(interval: str = Query(default="1m"), limit: int = Query(default=50, ge=1, le=500)):
-    """Get kline data for QRL/USDT."""
-    usecase = GetKlineUseCase()
-    from src.app.application.market.use_cases.get_kline import GetKlineInput
-
-    return await usecase.execute(data=GetKlineInput(interval=interval, limit=limit))
-
-
-@router.get("/stats24h")
-async def get_stats_24h():
-    """Get 24h statistics for QRL/USDT."""
-    usecase = GetStats24hUseCase()
-    return await usecase.execute()
-
-
-@router.get("/trades")
-async def get_market_trades(limit: int = Query(default=50, ge=1, le=500)):
-    """Get recent public trades for QRL/USDT."""
-    usecase = GetMarketTradesUseCase()
-    return await usecase.execute(data=GetMarketTradesInput(limit=limit))
 </file>
 
 <file path="src/app/interfaces/http/api/qrl_routes.py">
@@ -4367,242 +4603,6 @@ class MexcSettings(BaseSettings):
 
   window.orderDomain = { cancelOrder };
 })();
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/factories.py">
-"""
-Factories to translate MEXC REST/WebSocket DTOs into domain aggregates.
-
-These implementations are intentionally lightweight placeholders. They ensure
-that aggregate construction paths are present and wired, while allowing the
-future work to enrich the mapping with full business rules.
-"""
-
-from datetime import datetime, timezone
-from decimal import Decimal
-from typing import Iterable, Optional
-
-from src.app.domain.aggregates.account_state import AccountState
-from src.app.domain.aggregates.market_snapshot import MarketSnapshot
-from src.app.domain.aggregates.trading_session import TradingSession
-from src.app.domain.factories.aggregates import (
-    build_account_state,
-    build_market_snapshot,
-    build_trading_session,
-)
-from src.app.domain.entities.account import Account
-from src.app.domain.entities.kline import Kline
-from src.app.domain.entities.order import Order
-from src.app.domain.entities.order_book_level import OrderBookLevel
-from src.app.domain.entities.trade import Trade
-from src.app.domain.value_objects.balance import Balance
-from src.app.domain.value_objects.kline_interval import KlineInterval
-from src.app.domain.value_objects.order_id import OrderId
-from src.app.domain.value_objects.order_side import OrderSide
-from src.app.domain.value_objects.order_type import OrderType
-from src.app.domain.value_objects.order_status import OrderStatus
-from src.app.domain.value_objects.quantity import Quantity
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.ticker import Ticker
-from src.app.domain.value_objects.timestamp import Timestamp
-from src.app.domain.value_objects.trade_id import TradeId
-from src.app.infrastructure.exchange.mexc.generated import (
-    PrivateAccountV3Api_pb2,
-    PrivateOrdersV3Api_pb2,
-    PublicAggreDepthsV3Api_pb2,
-    PublicAggreDealsV3Api_pb2,
-    PublicBookTickerV3Api_pb2,
-    PublicSpotKlineV3Api_pb2,
-)
-
-
-def _default_timestamp() -> Timestamp:
-    return Timestamp(datetime.now(timezone.utc))
-
-
-def _levels_from_depth(
-    depth: Optional[PublicAggreDepthsV3Api_pb2.PublicAggreDepthsV3Api],
-) -> tuple[list[OrderBookLevel], list[OrderBookLevel]]:
-    if depth is None:
-        return [], []
-
-    bids = [
-        OrderBookLevel(
-            price=Decimal(str(item.price)),
-            quantity=Decimal(str(item.quantity)),
-            side=OrderSide("BUY"),
-        )
-        for item in getattr(depth, "bids", [])  # type: ignore[attr-defined]
-    ]
-    asks = [
-        OrderBookLevel(
-            price=Decimal(str(item.price)),
-            quantity=Decimal(str(item.quantity)),
-            side=OrderSide("SELL"),
-        )
-        for item in getattr(depth, "asks", [])  # type: ignore[attr-defined]
-    ]
-    return bids, asks
-
-
-def market_snapshot_from_sources(
-    symbol: Symbol,
-    depth_proto: Optional[PublicAggreDepthsV3Api_pb2.PublicAggreDepthsV3Api] = None,
-    trades: Optional[Iterable[Trade]] = None,
-    ticker_proto: Optional[PublicBookTickerV3Api_pb2.PublicBookTickerV3Api] = None,
-) -> MarketSnapshot:
-    """
-    Build a MarketSnapshot aggregate from available feed DTOs.
-
-    The function accepts partial data (depth only, depth + trades, etc.) so
-    the callers can incrementally enrich the snapshot.
-    """
-
-    bids, asks = _levels_from_depth(depth_proto)
-    ticker: Ticker | None = None
-    if ticker_proto is not None:
-        bid = Decimal(str(getattr(ticker_proto, "bidPrice", 0)))
-        ask = Decimal(str(getattr(ticker_proto, "askPrice", 0)))
-        last = Decimal(str(getattr(ticker_proto, "lastPrice", 0)))
-        if bid > 0 and ask > 0 and last > 0:
-            ticker = Ticker(
-                symbol=symbol,
-                last_price=last,
-                bid_price=bid,
-                ask_price=ask,
-                ts=_default_timestamp().value,
-            )
-
-    return build_market_snapshot(
-        symbol=symbol,
-        bids=bids,
-        asks=asks,
-        trades=list(trades or []),
-        ticker=ticker,
-    )
-
-
-def account_state_from_proto(
-    symbol: Symbol, account_proto: PrivateAccountV3Api_pb2.PrivateAccountV3Api
-) -> AccountState:
-    """
-    Translate private account snapshot DTO into AccountState aggregate.
-
-    Balance parsing is intentionally minimal; further normalization can be
-    implemented when business rules are ready.
-    """
-
-    balances: list[Balance] = []
-    for item in getattr(account_proto, "balances", []):  # type: ignore[attr-defined]
-        balances.append(
-            Balance(
-                asset=getattr(item, "asset", ""),
-                free=Decimal(str(getattr(item, "free", 0))),
-                locked=Decimal(str(getattr(item, "locked", 0))),
-            )
-        )
-
-    account = Account(
-        can_trade=bool(getattr(account_proto, "canTrade", True)),
-        update_time=_default_timestamp(),
-        balances=balances,
-    )
-    return build_account_state(symbol=symbol, account=account, open_orders=[])
-
-
-def trading_session_from_orders(
-    symbol: Symbol, orders: Optional[Iterable[Order]] = None, trades: Optional[Iterable[Trade]] = None
-) -> TradingSession:
-    """Create a TradingSession aggregate from existing order/trade records."""
-
-    return build_trading_session(symbol=symbol, orders=orders or [], trades=trades or [])
-
-
-def trades_from_public_proto(
-    symbol: Symbol, deals_proto: Optional[PublicAggreDealsV3Api_pb2.PublicAggreDealsV3Api] = None
-) -> list[Trade]:
-    """Convert public trades DTO to domain trades (skeleton mapping)."""
-
-    if deals_proto is None:
-        return []
-
-    trades: list[Trade] = []
-    for item in getattr(deals_proto, "deals", []):  # type: ignore[attr-defined]
-        trade_id_str = str(getattr(item, "tradeId", "0"))
-        order_id_str = str(getattr(item, "orderId", "0"))
-        trades.append(
-            Trade(
-                trade_id=TradeId(trade_id_str),
-                order_id=OrderId(order_id_str),
-                symbol=symbol,
-                side=OrderSide("BUY") if bool(getattr(item, "isBuyerMaker", False)) else OrderSide("SELL"),
-                price=Decimal(str(getattr(item, "price", 0))),
-                quantity=Decimal(str(getattr(item, "quantity", 0))),
-                fee=None,
-                fee_asset=None,
-                timestamp=_default_timestamp(),
-            )
-        )
-    return trades
-
-
-def klines_from_proto(
-    symbol: Symbol, kline_proto: Optional[PublicSpotKlineV3Api_pb2.PublicSpotKlineV3Api] = None
-) -> list[Kline]:
-    """Convert spot kline DTOs to domain klines (skeleton mapping)."""
-
-    if kline_proto is None:
-        return []
-
-    klines: list[Kline] = []
-    interval = KlineInterval(str(getattr(kline_proto, "interval", "1m")))
-    for item in getattr(kline_proto, "klineList", []):  # type: ignore[attr-defined]
-        open_time_ms = int(getattr(item, "openTime", 0))
-        close_time_ms = int(getattr(item, "closeTime", 0))
-        klines.append(
-            Kline(
-                symbol=symbol,
-                interval=interval,
-                open=Decimal(str(getattr(item, "open", 0))),
-                high=Decimal(str(getattr(item, "high", 0))),
-                low=Decimal(str(getattr(item, "low", 0))),
-                close=Decimal(str(getattr(item, "close", 0))),
-                volume=Decimal(str(getattr(item, "volume", 0))),
-                open_time=Timestamp(datetime.fromtimestamp(open_time_ms / 1000, tz=timezone.utc)),
-                close_time=Timestamp(datetime.fromtimestamp(close_time_ms / 1000, tz=timezone.utc)),
-            )
-        )
-    return klines
-
-
-def orders_from_private_proto(
-    symbol: Symbol, orders_proto: Optional[PrivateOrdersV3Api_pb2.PrivateOrdersV3Api] = None
-) -> list[Order]:
-    """Convert private orders DTO to domain orders (skeleton mapping)."""
-
-    if orders_proto is None:
-        return []
-
-    orders: list[Order] = []
-    for item in getattr(orders_proto, "orders", []):  # type: ignore[attr-defined]
-        orders.append(
-            Order(
-                order_id=OrderId(str(getattr(item, "orderId", ""))),
-                symbol=symbol,
-                side=OrderSide(str(getattr(item, "side", "BUY"))),
-                order_type=OrderType(str(getattr(item, "type", "LIMIT"))),
-                status=OrderStatus(str(getattr(item, "status", "NEW"))),
-                price=Decimal(str(getattr(item, "price", 0))),
-                quantity=Quantity(Decimal(str(getattr(item, "origQty", 0)))),
-                created_at=_default_timestamp(),
-                time_in_force=None,
-                client_order_id=str(getattr(item, "clientOrderId", "")) if getattr(item, "clientOrderId", None) else None,
-                executed_quantity=Decimal(str(getattr(item, "executedQty", 0))),
-                cumulative_quote_quantity=Decimal(str(getattr(item, "cummulativeQuoteQty", 0))),
-                updated_at=_default_timestamp(),
-            )
-        )
-    return orders
 </file>
 
 <file path="src/app/infrastructure/exchange/mexc/mappers.py">
@@ -5492,190 +5492,6 @@ def _result_from_success(
 <script src="/static/js/pages/dashboard.js" defer></script>
 </body>
 </html>
-</file>
-
-<file path="tests/test_allocation_use_case.py">
-from datetime import datetime, timezone
-from decimal import Decimal
-import pytest
-
-from src.app.application.exchange.mexc_service import PlaceOrderRequest
-from src.app.application.system.use_cases.allocation import AllocationUseCase
-from src.app.domain.entities.account import Account
-from src.app.domain.entities.order import Order
-from src.app.domain.value_objects.balance import Balance
-from src.app.domain.value_objects.order_book import DepthLevel, OrderBook
-from src.app.domain.value_objects.order_id import OrderId
-from src.app.domain.value_objects.order_status import OrderStatus
-from src.app.domain.value_objects.order_type import OrderType
-from src.app.domain.value_objects.price import Price
-from src.app.domain.value_objects.quantity import Quantity
-from src.app.domain.value_objects.side import Side
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.time_in_force import TimeInForce
-from src.app.domain.value_objects.timestamp import Timestamp
-
-
-class FakeService:
-    def __init__(
-        self,
-        qrl_free: str,
-        usdt_free: str,
-        *,
-        qrl_locked: str = "0",
-        usdt_locked: str = "0",
-        bids: list[DepthLevel] | None = None,
-        asks: list[DepthLevel] | None = None,
-        price_bid: str = "1",
-        price_ask: str = "1",
-    ):
-        self._qrl_free = Decimal(qrl_free)
-        self._usdt_free = Decimal(usdt_free)
-        self._qrl_locked = Decimal(qrl_locked)
-        self._usdt_locked = Decimal(usdt_locked)
-        self._book = OrderBook(bids=bids or [], asks=asks or [])
-        self._price = Price(
-            bid=Decimal(price_bid),
-            ask=Decimal(price_ask),
-            last=Decimal(price_bid),
-            timestamp=Timestamp(datetime.now(timezone.utc)),
-        )
-        self.last_order_request: PlaceOrderRequest | None = None
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb):
-        return None
-
-    async def get_account(self) -> Account:
-        return Account(
-            can_trade=True,
-            update_time=Timestamp(datetime.now(timezone.utc)),
-            balances=[
-                Balance(asset="QRL", free=self._qrl_free, locked=self._qrl_locked),
-                Balance(asset="USDT", free=self._usdt_free, locked=self._usdt_locked),
-            ],
-        )
-
-    async def get_depth(self, symbol: Symbol, limit: int = 50) -> OrderBook:
-        return self._book
-
-    async def get_price(self, symbol: Symbol) -> Price:
-        return self._price
-
-    async def place_order(self, request: PlaceOrderRequest) -> Order:
-        self.last_order_request = request
-        return Order(
-            order_id=OrderId("test-order"),
-            symbol=request.symbol,
-            side=request.side,
-            order_type=request.order_type,
-            status=OrderStatus("NEW"),
-            price=request.price.last if request.price else Decimal("0"),
-            quantity=request.quantity,
-            created_at=Timestamp(datetime.now(timezone.utc)),
-            time_in_force=request.time_in_force,
-        )
-
-
-@pytest.mark.asyncio
-async def test_allocation_skips_when_balances_even():
-    service = FakeService(qrl_free="1", usdt_free="1")
-    usecase = AllocationUseCase(service_factory=lambda: service)
-
-    result = await usecase.execute()
-
-    assert result.status == "skipped"
-    assert result.action == "SKIP"
-    assert result.order_id is None
-    assert service.last_order_request is None
-
-
-@pytest.mark.asyncio
-async def test_allocation_uses_locked_balances_for_ratio():
-    service = FakeService(qrl_free="0.2", qrl_locked="0.8", usdt_free="1")
-    usecase = AllocationUseCase(service_factory=lambda: service)
-
-    result = await usecase.execute()
-
-    assert result.status == "skipped"
-    assert result.action == "SKIP"
-    assert service.last_order_request is None
-
-
-@pytest.mark.asyncio
-async def test_allocation_rejects_on_slippage():
-    service = FakeService(
-        qrl_free="0.1",
-        usdt_free="5",
-        asks=[
-            DepthLevel(price=Decimal("1"), quantity=Decimal("0.1")),
-            DepthLevel(price=Decimal("2.5"), quantity=Decimal("1")),
-        ],
-    )
-    usecase = AllocationUseCase(service_factory=lambda: service, slippage_threshold_pct=Decimal("5"))
-
-    result = await usecase.execute()
-
-    assert result.status == "rejected"
-    assert result.action == "REJECTED"
-    assert result.order_id is None
-    assert result.reason is not None
-    assert service.last_order_request is None
-
-
-@pytest.mark.asyncio
-async def test_allocation_places_order_when_slippage_ok():
-    service = FakeService(
-        qrl_free="2",
-        usdt_free="1",
-        bids=[DepthLevel(price=Decimal("1.01"), quantity=Decimal("1.5"))],
-        asks=[DepthLevel(price=Decimal("1.02"), quantity=Decimal("1.0"))],
-    )
-    usecase = AllocationUseCase(service_factory=lambda: service)
-
-    result = await usecase.execute()
-
-    assert result.status == "ok"
-    assert result.action == "SELL"
-    assert result.order_id == "test-order"
-    assert result.expected_fill == Decimal("1")
-    assert service.last_order_request is not None
-    assert service.last_order_request.side.value == "SELL"
-    assert service.last_order_request.price is not None
-    assert service.last_order_request.price.last == Decimal("1.02102")
-    assert service.last_order_request.quantity.value == Decimal("1")
-    assert service.last_order_request.time_in_force == TimeInForce("GTC")
-
-
-@pytest.mark.asyncio
-async def test_allocation_skips_when_value_balanced_but_qty_not():
-    # QRL qty > USDT qty, but price=0.5 makes values equal (1 USDT vs 1 USDT)
-    service = FakeService(qrl_free="2", usdt_free="1", price_bid="0.5", price_ask="0.5")
-    usecase = AllocationUseCase(service_factory=lambda: service)
-
-    result = await usecase.execute()
-
-    assert result.status == "skipped"
-    assert service.last_order_request is None
-
-
-@pytest.mark.asyncio
-async def test_allocation_rejects_when_price_unavailable(monkeypatch):
-    service = FakeService(qrl_free="0.5", usdt_free="1")
-
-    async def raise_price(symbol: Symbol):
-        raise RuntimeError("price failed")
-
-    service.get_price = raise_price  # type: ignore
-    usecase = AllocationUseCase(service_factory=lambda: service)
-
-    result = await usecase.execute()
-
-    assert result.status == "rejected"
-    assert result.reason == "Price unavailable"
-    assert service.last_order_request is None
 </file>
 
 </files>
