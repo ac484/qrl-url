@@ -31,11 +31,14 @@ class AllocationConfig:
 
     SYMBOL = Symbol("QRLUSDT")
     TIME_IN_FORCE = TimeInForce("GTC")
-    LIMIT_PRICE = Decimal("1")
-    TARGET_QUANTITY = Quantity(Decimal("1"))
+    TARGET_RATIO = Decimal("0.5")
+    TOLERANCE_PCT = Decimal("1")
+    MIN_NOTIONAL = Decimal("0.1")
+    MAX_NOTIONAL = Decimal("100")
     DEPTH_LIMIT = 20
     SLIPPAGE_THRESHOLD_PCT = Decimal("5")
     PRICE_BUFFER_PCT = Decimal("0.001")  # 0.1%
+    LIMIT_PRICE_CAP: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -61,38 +64,54 @@ class AllocationUseCase:
         *,
         depth_limit: int = AllocationConfig.DEPTH_LIMIT,
         slippage_threshold_pct: Decimal = AllocationConfig.SLIPPAGE_THRESHOLD_PCT,
-        target_quantity: Quantity | None = None,
-        limit_price: Decimal = AllocationConfig.LIMIT_PRICE,
+        target_ratio: Decimal = AllocationConfig.TARGET_RATIO,
+        tolerance_pct: Decimal = AllocationConfig.TOLERANCE_PCT,
+        min_notional: Decimal = AllocationConfig.MIN_NOTIONAL,
+        max_notional: Decimal = AllocationConfig.MAX_NOTIONAL,
+        limit_price: Decimal | None = AllocationConfig.LIMIT_PRICE_CAP,
     ):
         self._service_factory = service_factory or (lambda: build_mexc_service(MexcSettings()))
-        self._comparison_rule = BalanceComparisonRule()
+        self._comparison_rule = BalanceComparisonRule(target_ratio=target_ratio, tolerance_pct=tolerance_pct)
         self._depth_calculator = DepthCalculator()
         self._slippage_analyzer = SlippageAnalyzer(slippage_threshold_pct)
         self._valuation_service = ValuationService()
         self._depth_limit = depth_limit
-        self._target_quantity = target_quantity or AllocationConfig.TARGET_QUANTITY
-        self._limit_price = Decimal(limit_price)
+        self._min_notional = Decimal(min_notional)
+        self._max_notional = Decimal(max_notional)
+        self._limit_price = Decimal(limit_price) if limit_price is not None else None
 
     async def execute(self) -> AllocationResult:
         """Compare balances, evaluate depth/slippage, and submit a balancing order."""
         request_id = str(uuid4())
         executed_at = datetime.now(timezone.utc)
         async with self._service_factory() as svc:
-            account = await svc.get_account()
             try:
+                account = await svc.get_account()
                 quote = await svc.get_price(AllocationConfig.SYMBOL)
                 mid_price = (quote.bid + quote.ask) / Decimal("2")
-            except Exception:
-                return _result_from_price_error(request_id, executed_at)
+            except Exception as exc:
+                return _result_from_price_error(request_id, executed_at, detail=str(exc))
 
             balances = _normalize_balances(account, mid_price, self._valuation_service)
             comparison = self._comparison_rule.evaluate(balances)
             if comparison.action == "skip" or comparison.preferred_side is None:
                 return _result_from_skip(request_id, executed_at, comparison)
 
+            target_notional = abs(comparison.diff)
+            if target_notional < self._min_notional:
+                return _result_from_skip(
+                    request_id,
+                    executed_at,
+                    comparison,
+                    reason="Below minimum notional threshold",
+                )
+
+            notional_to_trade = min(target_notional, self._max_notional)
+            target_quantity = Quantity(notional_to_trade / mid_price)
+
             order_book = await svc.get_depth(AllocationConfig.SYMBOL, limit=self._depth_limit)
             filled, weighted_price = self._depth_calculator.compute(
-                order_book, comparison.preferred_side, self._target_quantity
+                order_book, comparison.preferred_side, target_quantity
             )
             best_bid = _best_bid(order_book)
             best_ask = _best_ask(order_book)
@@ -104,7 +123,7 @@ class AllocationUseCase:
             slippage = self._slippage_analyzer.assess(
                 side=comparison.preferred_side,
                 desired_price=top_price,
-                target_quantity=self._target_quantity,
+                target_quantity=target_quantity,
                 fill_quantity=filled,
                 weighted_price=weighted_price,
             )
@@ -116,15 +135,16 @@ class AllocationUseCase:
                 best_bid=best_bid,
                 best_ask=best_ask,
                 buffer_pct=AllocationConfig.PRICE_BUFFER_PCT,
+                limit_price_cap=self._limit_price,
             )
             if limit_price is None:
                 return _result_from_slippage(
                     request_id,
                     executed_at,
                     SlippageAssessment(Decimal("0"), Decimal("0"), False, "Cannot place maker limit"),
-                )
+            )
             command = _build_order_command(
-                side=comparison.preferred_side, quantity=self._target_quantity, limit_price=limit_price
+                side=comparison.preferred_side, quantity=target_quantity, limit_price=limit_price
             )
             order = await svc.place_order(
                 PlaceOrderRequest(
@@ -134,6 +154,7 @@ class AllocationUseCase:
                     quantity=command.quantity,
                     price=command.price,
                     time_in_force=command.time_in_force,
+                    client_order_id=request_id,
                 )
             )
 
@@ -152,11 +173,11 @@ def _normalize_balances(account: Account, mid_price: Decimal, valuation: Valuati
     usdt = Decimal("0")
     for bal in account.balances:
         if bal.asset.upper() == "QRL":
-            qrl = bal.free
+            qrl += bal.free + bal.locked
         if bal.asset.upper() == "USDT":
-            usdt = bal.free
-    qrl_value = valuation.value(qrl, mid_price)
-    return NormalizedBalances(qrl_free=qrl_value, usdt_free=usdt)
+            usdt += bal.free + bal.locked
+    qrl_value = valuation.value(qrl, mid_price) if qrl > 0 else Decimal("0")
+    return NormalizedBalances(qrl_value=qrl_value, usdt_value=usdt)
 
 
 def _build_order_command(*, side: Side, quantity: Quantity, limit_price: Decimal) -> OrderCommand:
@@ -186,23 +207,34 @@ def _best_ask(book: OrderBook) -> Decimal:
     return min(asks) if asks else Decimal("0")
 
 
-def _compute_limit_price(*, side: Side, best_bid: Decimal, best_ask: Decimal, buffer_pct: Decimal) -> Decimal | None:
-    """Return a maker-style limit price that does not cross the spread."""
+def _compute_limit_price(
+    *,
+    side: Side,
+    best_bid: Decimal,
+    best_ask: Decimal,
+    buffer_pct: Decimal,
+    limit_price_cap: Decimal | None = None,
+) -> Decimal | None:
+    """Return a maker-style limit price bounded by optional config."""
     if best_bid <= 0 or best_ask <= 0 or best_bid >= best_ask:
         return None
     if side.value == "BUY":
         candidate = best_bid * (Decimal("1") - buffer_pct)
+        if limit_price_cap is not None:
+            candidate = min(candidate, limit_price_cap)
         if candidate >= best_ask:
             return None
         return candidate
     candidate = best_ask * (Decimal("1") + buffer_pct)
+    if limit_price_cap is not None:
+        candidate = max(candidate, limit_price_cap)
     if candidate <= best_bid:
         return None
     return candidate
 
 
 def _result_from_skip(
-    request_id: str, executed_at: datetime, comparison: BalanceComparisonResult
+    request_id: str, executed_at: datetime, comparison: BalanceComparisonResult, reason: str | None = None
 ) -> AllocationResult:
     return AllocationResult(
         request_id=request_id,
@@ -210,7 +242,7 @@ def _result_from_skip(
         executed_at=executed_at,
         action="SKIP",
         order_id=None,
-        reason=comparison.reason,
+        reason=reason or comparison.reason,
         slippage_pct=None,
         expected_fill=None,
     )
@@ -231,14 +263,14 @@ def _result_from_slippage(
     )
 
 
-def _result_from_price_error(request_id: str, executed_at: datetime) -> AllocationResult:
+def _result_from_price_error(request_id: str, executed_at: datetime, *, detail: str | None = None) -> AllocationResult:
     return AllocationResult(
         request_id=request_id,
         status="rejected",
         executed_at=executed_at,
         action="REJECTED",
         order_id=None,
-        reason="Price unavailable",
+        reason="Price unavailable" if detail is None else f"Price unavailable: {detail}",
         slippage_pct=None,
         expected_fill=None,
     )

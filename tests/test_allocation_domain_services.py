@@ -8,8 +8,8 @@ from src.app.domain.value_objects.side import Side
 
 
 def test_balance_comparison_skips_within_tolerance():
-    rule = BalanceComparisonRule(tolerance=Decimal("0.5"))
-    balances = NormalizedBalances(qrl_free=Decimal("1.0"), usdt_free=Decimal("1.2"))
+    rule = BalanceComparisonRule(tolerance_pct=Decimal("1"))
+    balances = NormalizedBalances(qrl_value=Decimal("1.0"), usdt_value=Decimal("1.02"))
 
     result = rule.evaluate(balances)
 
@@ -19,9 +19,9 @@ def test_balance_comparison_skips_within_tolerance():
 
 
 def test_balance_comparison_prefers_sell_when_qrl_higher():
-    rule = BalanceComparisonRule()
+    rule = BalanceComparisonRule(target_ratio=Decimal("0.5"), tolerance_pct=Decimal("1"))
 
-    result = rule.evaluate(NormalizedBalances(qrl_free=Decimal("3"), usdt_free=Decimal("1")))
+    result = rule.evaluate(NormalizedBalances(qrl_value=Decimal("3"), usdt_value=Decimal("1")))
 
     assert result.action == "trade"
     assert result.preferred_side == Side("SELL")

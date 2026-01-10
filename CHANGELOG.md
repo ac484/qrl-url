@@ -5,7 +5,8 @@
 ### Added
 - POST `/tasks/allocation` endpoint for Cloud Scheduler triggers.
 - `/api/tasks/allocation` alias for Cloud Scheduler triggers to match the API namespace.
-- Allocation use case now checks QRL vs USDT balances and submits a 1-unit limit order at price 1 based on the higher side.
+- Allocation flow now compares free + locked balances using a 50/50 target ratio with tolerance, derives notional trade size dynamically, and applies slippage/depth checks before submitting maker limit orders (client-order-id = request id).
+- Added optional notional guards, limit-price cap, and consideration of locked balances in allocation decisions.
 
 ### Testing
-- Added `tests/test_allocation_use_case.py` to cover allocation use case behavior.
+- Added unit coverage for ratio-based balance comparison, locked-balance handling, and updated allocation use case scenarios.

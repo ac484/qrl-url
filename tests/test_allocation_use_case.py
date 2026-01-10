@@ -25,6 +25,8 @@ class FakeService:
         qrl_free: str,
         usdt_free: str,
         *,
+        qrl_locked: str = "0",
+        usdt_locked: str = "0",
         bids: list[DepthLevel] | None = None,
         asks: list[DepthLevel] | None = None,
         price_bid: str = "1",
@@ -32,6 +34,8 @@ class FakeService:
     ):
         self._qrl_free = Decimal(qrl_free)
         self._usdt_free = Decimal(usdt_free)
+        self._qrl_locked = Decimal(qrl_locked)
+        self._usdt_locked = Decimal(usdt_locked)
         self._book = OrderBook(bids=bids or [], asks=asks or [])
         self._price = Price(
             bid=Decimal(price_bid),
@@ -52,8 +56,8 @@ class FakeService:
             can_trade=True,
             update_time=Timestamp(datetime.now(timezone.utc)),
             balances=[
-                Balance(asset="QRL", free=self._qrl_free, locked=Decimal("0")),
-                Balance(asset="USDT", free=self._usdt_free, locked=Decimal("0")),
+                Balance(asset="QRL", free=self._qrl_free, locked=self._qrl_locked),
+                Balance(asset="USDT", free=self._usdt_free, locked=self._usdt_locked),
             ],
         )
 
@@ -92,6 +96,19 @@ async def test_allocation_skips_when_balances_even():
 
 
 @pytest.mark.asyncio
+async def test_allocation_counts_locked_balances():
+    # Locked QRL keeps ratio near target, so no new trade is placed.
+    service = FakeService(qrl_free="0.1", qrl_locked="3", usdt_free="3")
+    usecase = AllocationUseCase(service_factory=lambda: service)
+
+    result = await usecase.execute()
+
+    assert result.status == "skipped"
+    assert result.order_id is None
+    assert service.last_order_request is None
+
+
+@pytest.mark.asyncio
 async def test_allocation_rejects_on_slippage():
     service = FakeService(
         qrl_free="0.1",
@@ -119,6 +136,8 @@ async def test_allocation_places_order_when_slippage_ok():
         usdt_free="1",
         bids=[DepthLevel(price=Decimal("1.01"), quantity=Decimal("1.5"))],
         asks=[DepthLevel(price=Decimal("1.02"), quantity=Decimal("1.0"))],
+        price_bid="1.01",
+        price_ask="1.02",
     )
     usecase = AllocationUseCase(service_factory=lambda: service)
 
@@ -127,12 +146,12 @@ async def test_allocation_places_order_when_slippage_ok():
     assert result.status == "ok"
     assert result.action == "SELL"
     assert result.order_id == "test-order"
-    assert result.expected_fill == Decimal("1")
+    assert result.expected_fill.quantize(Decimal("0.00000001")) == Decimal("0.50738916")
     assert service.last_order_request is not None
     assert service.last_order_request.side.value == "SELL"
     assert service.last_order_request.price is not None
     assert service.last_order_request.price.last == Decimal("1.02102")
-    assert service.last_order_request.quantity.value == Decimal("1")
+    assert service.last_order_request.quantity.value.quantize(Decimal("0.00000001")) == Decimal("0.50738916")
     assert service.last_order_request.time_in_force == TimeInForce("GTC")
 
 
@@ -161,5 +180,5 @@ async def test_allocation_rejects_when_price_unavailable(monkeypatch):
     result = await usecase.execute()
 
     assert result.status == "rejected"
-    assert result.reason == "Price unavailable"
+    assert result.reason.startswith("Price unavailable")
     assert service.last_order_request is None
