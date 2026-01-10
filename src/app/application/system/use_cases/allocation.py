@@ -1,12 +1,17 @@
 """System use case to expose an allocation trigger for schedulers."""
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Callable
 from uuid import uuid4
 
-from src.app.application.exchange.mexc_service import MexcService, PlaceOrderRequest, build_mexc_service
+from src.app.application.exchange.mexc_service import (
+    CancelOrderRequest,
+    MexcService,
+    PlaceOrderRequest,
+    build_mexc_service,
+)
 from src.app.domain.entities.account import Account
 from src.app.domain.services.balance_comparison_rule import BalanceComparisonRule
 from src.app.domain.services.depth_calculator import DepthCalculator
@@ -79,6 +84,7 @@ class AllocationUseCase:
         executed_at = datetime.now(timezone.utc)
         async with self._service_factory() as svc:
             account = await svc.get_account()
+            await _cancel_stale_orders(svc, executed_at)
             try:
                 quote = await svc.get_price(AllocationConfig.SYMBOL)
                 mid_price = (quote.bid + quote.ask) / Decimal("2")
@@ -262,3 +268,12 @@ def _result_from_success(
         slippage_pct=slippage.slippage_pct,
         expected_fill=slippage.expected_fill,
     )
+
+
+async def _cancel_stale_orders(service: MexcService, now: datetime) -> None:
+    """Cancel open orders older than 24h to keep allocation flow tidy."""
+    cutoff = now - timedelta(hours=24)
+    open_orders = await service.list_open_orders(symbol=AllocationConfig.SYMBOL)
+    for order in open_orders:
+        if order.created_at.value < cutoff:
+            await service.cancel_order(CancelOrderRequest(symbol=order.symbol, order_id=order.order_id.value))

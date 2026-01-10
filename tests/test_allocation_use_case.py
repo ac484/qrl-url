@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import pytest
 
@@ -29,6 +29,7 @@ class FakeService:
         asks: list[DepthLevel] | None = None,
         price_bid: str = "1",
         price_ask: str = "1",
+        open_orders: list[Order] | None = None,
     ):
         self._qrl_free = Decimal(qrl_free)
         self._usdt_free = Decimal(usdt_free)
@@ -40,6 +41,8 @@ class FakeService:
             timestamp=Timestamp(datetime.now(timezone.utc)),
         )
         self.last_order_request: PlaceOrderRequest | None = None
+        self._open_orders = open_orders or []
+        self.canceled_orders: list[str] = []
 
     async def __aenter__(self):
         return self
@@ -75,6 +78,22 @@ class FakeService:
             quantity=request.quantity,
             created_at=Timestamp(datetime.now(timezone.utc)),
             time_in_force=request.time_in_force,
+        )
+
+    async def list_open_orders(self, symbol: Symbol | None = None) -> list[Order]:
+        return self._open_orders
+
+    async def cancel_order(self, request):
+        self.canceled_orders.append(request.order_id or "")
+        return Order(
+            order_id=OrderId(request.order_id or "cancelled"),
+            symbol=request.symbol,
+            side=Side("SELL"),
+            order_type=OrderType("LIMIT"),
+            status=OrderStatus("CANCELED"),
+            price=Decimal("0"),
+            quantity=Quantity(Decimal("0.00000001")),
+            created_at=Timestamp(datetime.now(timezone.utc)),
         )
 
 
@@ -163,3 +182,36 @@ async def test_allocation_rejects_when_price_unavailable(monkeypatch):
     assert result.status == "rejected"
     assert result.reason == "Price unavailable"
     assert service.last_order_request is None
+
+
+@pytest.mark.asyncio
+async def test_allocation_cancels_stale_orders_before_flow():
+    stale_time = datetime.now(timezone.utc) - timedelta(hours=25)
+    fresh_time = datetime.now(timezone.utc) - timedelta(hours=1)
+    stale_order = Order(
+        order_id=OrderId("stale-1"),
+        symbol=Symbol("QRLUSDT"),
+        side=Side("SELL"),
+        order_type=OrderType("LIMIT"),
+        status=OrderStatus("NEW"),
+        price=Decimal("1"),
+        quantity=Quantity(Decimal("1")),
+        created_at=Timestamp(stale_time),
+    )
+    fresh_order = Order(
+        order_id=OrderId("fresh-1"),
+        symbol=Symbol("QRLUSDT"),
+        side=Side("SELL"),
+        order_type=OrderType("LIMIT"),
+        status=OrderStatus("NEW"),
+        price=Decimal("1"),
+        quantity=Quantity(Decimal("1")),
+        created_at=Timestamp(fresh_time),
+    )
+    service = FakeService(qrl_free="0.1", usdt_free="5", open_orders=[stale_order, fresh_order])
+    usecase = AllocationUseCase(service_factory=lambda: service)
+
+    await usecase.execute()
+
+    assert "stale-1" in service.canceled_orders
+    assert "fresh-1" not in service.canceled_orders
