@@ -18,6 +18,7 @@ from src.app.domain.value_objects.symbol import Symbol
 from src.app.domain.value_objects.time_in_force import TimeInForce
 from src.app.domain.value_objects.timestamp import Timestamp
 from src.app.domain.value_objects.trade_id import TradeId
+from src.app.domain.value_objects.qrl_price import QrlPrice
 
 
 def _to_decimal(value: Any) -> Decimal:
@@ -56,13 +57,20 @@ def order_from_api(payload: dict[str, Any]) -> Order:
     order_id_value = payload.get("orderId")
     if order_id_value is None:
         raise ValueError("orderId is required in MEXC response")
+    price_raw = payload.get("price", payload.get("origPrice"))
+    price_vo: QrlPrice | None = None
+    if price_raw not in (None, "", 0, "0"):
+        try:
+            price_vo = QrlPrice(_to_decimal(price_raw))
+        except (InvalidOperation, ValueError):
+            price_vo = None
     return Order(
         order_id=OrderId(str(order_id_value)),
         symbol=Symbol(payload.get("symbol", "QRLUSDT")),
         side=Side(payload.get("side", "BUY")),
         order_type=OrderType(payload.get("type", "LIMIT")),
         status=OrderStatus(payload.get("status", "NEW")),
-        price=_to_decimal(payload.get("price", "0")),
+        price=price_vo,
         quantity=Quantity(_to_decimal(payload.get("origQty", payload.get("quantity", "0.00000001")))),
         time_in_force=TimeInForce(payload["timeInForce"]) if payload.get("timeInForce") else None,
         created_at=_to_timestamp_from_ms(payload.get("transactTime", payload.get("createTime", 0))),
@@ -83,8 +91,8 @@ def trade_from_api(payload: dict[str, Any]) -> Trade:
         order_id=OrderId(str(payload.get("orderId"))),
         symbol=Symbol(payload.get("symbol", "QRLUSDT")),
         side=Side("BUY" if payload.get("isBuyer") else "SELL"),
-        price=_to_decimal(payload.get("price", "0")),
-        quantity=_to_decimal(payload.get("qty", payload.get("quantity", "0"))),
+        price=QrlPrice(_to_decimal(payload.get("price", "0"))),
+        quantity=Quantity(_to_decimal(payload.get("qty", payload.get("quantity", "0")))),
         fee=_to_decimal(payload["commission"]) if payload.get("commission") else None,
         fee_asset=payload.get("commissionAsset"),
         timestamp=_to_timestamp_from_ms(payload.get("time", 0)),

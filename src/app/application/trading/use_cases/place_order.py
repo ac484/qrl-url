@@ -21,7 +21,7 @@ def _serialize_order(order: Order) -> dict:
         "side": order.side.value,
         "type": order.order_type.value,
         "status": order.status.value,
-        "price": str(order.price),
+        "price": str(order.price.value) if order.price else None,
         "quantity": str(order.quantity.value),
         "executed_quantity": str(order.executed_quantity) if order.executed_quantity else None,
         "cumulative_quote_quantity": str(order.cumulative_quote_quantity)

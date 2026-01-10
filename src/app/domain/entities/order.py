@@ -10,6 +10,7 @@ from src.app.domain.value_objects.side import Side
 from src.app.domain.value_objects.symbol import Symbol
 from src.app.domain.value_objects.time_in_force import TimeInForce
 from src.app.domain.value_objects.timestamp import Timestamp
+from src.app.domain.value_objects.qrl_price import QrlPrice
 
 
 @dataclass
@@ -21,7 +22,7 @@ class Order:
     side: Side
     order_type: OrderType
     status: OrderStatus
-    price: Decimal
+    price: QrlPrice | None
     quantity: Quantity
     created_at: Timestamp
     time_in_force: TimeInForce | None = None
