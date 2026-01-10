@@ -121,16 +121,12 @@ class MexcRestClient:
     async def list_open_orders(self, *, symbol: str | None = None) -> list[dict[str, Any]]:
         params: dict[str, Any] = {"symbol": symbol} if symbol else {}
         result = await self._request("GET", "/api/v3/openOrders", params=params, signed=True)
-        if isinstance(result, list):
-            return result
-        return []
+        return result if isinstance(result, list) else []
 
     async def list_trades(self, *, symbol: str, limit: int = 50) -> list[dict[str, Any]]:
         params: dict[str, Any] = {"symbol": symbol, "limit": limit}
         result = await self._request("GET", "/api/v3/myTrades", params=params, signed=True)
-        if isinstance(result, list):
-            return result
-        return []
+        return result if isinstance(result, list) else []
 
     async def ticker_24h(self, *, symbol: str) -> dict[str, Any]:
         params = {"symbol": symbol}
@@ -139,17 +135,13 @@ class MexcRestClient:
     async def klines(self, *, symbol: str, interval: str, limit: int = 100) -> list[list[Any]]:
         params = {"symbol": symbol, "interval": interval, "limit": limit}
         result = await self._request("GET", "/api/v3/klines", params=params)
-        if isinstance(result, list):
-            return result
-        return []
+        return result if isinstance(result, list) else []
 
     async def trades(self, *, symbol: str, limit: int = 50) -> list[dict[str, Any]]:
         """Public recent trades."""
         params = {"symbol": symbol, "limit": limit}
         result = await self._request("GET", "/api/v3/trades", params=params)
-        if isinstance(result, list):
-            return result
-        return []
+        return result if isinstance(result, list) else []
 
     async def depth(self, *, symbol: str, limit: int = 50) -> dict[str, Any]:
         params: dict[str, Any] = {"symbol": symbol, "limit": limit}
