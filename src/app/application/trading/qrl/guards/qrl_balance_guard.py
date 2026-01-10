@@ -1,6 +1,3 @@
-from decimal import Decimal
+from src.app.domain.services.qrl_guards import ensure_sufficient_balance
 
-
-def ensure_sufficient_balance(available_usdt: Decimal, cost: Decimal) -> None:
-    if cost > available_usdt:
-        raise ValueError("Insufficient USDT balance for QRL order")
+__all__ = ["ensure_sufficient_balance"]
