@@ -1,3 +1,1 @@
-User Request:
-- Analyze project section /tasks/allocation > proportion analysis > place order.
-- Return all files involved in full /tasks/allocation flow in the RP (report/response).
+User request: Fix issue "需要把下訂單的鎖定也列入計算不然會循環下單" in repo ac484/qrl-url. Follow instructions: minimal changes, run report_progress with plan checklist, prefer tests, include locking in calculation to avoid repeated orders.
