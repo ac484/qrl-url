@@ -18,5 +18,8 @@ docs/
 .repomixignore
 .gitkeep
 
+Dockerfile
 Makefile
 LICENSE
+
+cloudbuild.yaml
