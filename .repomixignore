@@ -9,12 +9,14 @@ docs/
 *.md
 *.json
 *.txt
-
-Makefile
+*.proto
+*.css
 
 .env.example
 .gitattributes
 .gitignore
 .repomixignore
+.gitkeep
 
-
+Makefile
+LICENSE

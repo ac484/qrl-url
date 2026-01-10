@@ -74,6 +74,7 @@ src/app/application/system/use_cases/get_server_time.py
 src/app/application/system/use_cases/ping.py
 src/app/application/trading/__init__.py
 src/app/application/trading/dto/__init__.py
+src/app/application/trading/dtos.py
 src/app/application/trading/mappers/__init__.py
 src/app/application/trading/mappers/mexc.py
 src/app/application/trading/qrl/__init__.py
@@ -179,23 +180,6 @@ src/app/infrastructure/exchange/mexc/generated/PublicSpotKlineV3Api_pb2.py
 src/app/infrastructure/exchange/mexc/generated/PushDataV3ApiWrapper_pb2.py
 src/app/infrastructure/exchange/mexc/mappers.py
 src/app/infrastructure/exchange/mexc/proto/__init__.py
-src/app/infrastructure/exchange/mexc/proto/LICENSE
-src/app/infrastructure/exchange/mexc/proto/PrivateAccountV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PrivateDealsV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PrivateOrdersV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PublicAggreBookTickerV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PublicAggreDealsV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PublicAggreDepthsV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PublicBookTickerBatchV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PublicBookTickerV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PublicDealsV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PublicIncreaseDepthsBatchV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PublicIncreaseDepthsV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PublicLimitDepthsV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PublicMiniTickersV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PublicMiniTickerV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PublicSpotKlineV3Api.proto
-src/app/infrastructure/exchange/mexc/proto/PushDataV3ApiWrapper.proto
 src/app/infrastructure/exchange/mexc/qrl/__init__.py
 src/app/infrastructure/exchange/mexc/qrl/qrl_order_mapper.py
 src/app/infrastructure/exchange/mexc/qrl/qrl_price_mapper.py
@@ -230,9 +214,6 @@ src/app/interfaces/http/api/ws_routes.py
 src/app/interfaces/http/dependencies.py
 src/app/interfaces/http/pages/__init__.py
 src/app/interfaces/http/pages/dashboard_routes.py
-src/app/interfaces/http/pages/static/css/.gitkeep
-src/app/interfaces/http/pages/static/css/dashboard.css
-src/app/interfaces/http/pages/static/js/.gitkeep
 src/app/interfaces/http/pages/static/js/application/dashboard.js
 src/app/interfaces/http/pages/static/js/core/chart.js
 src/app/interfaces/http/pages/static/js/core/dom.js
@@ -473,6 +454,121 @@ class GetQrlKline:
 
 <file path="src/app/application/market/use_cases/__init__.py">
 # Market use cases.
+</file>
+
+<file path="src/app/application/market/use_cases/get_depth.py">
+"""
+Market use case: get order book depth for QRL/USDT.
+"""
+
+from dataclasses import dataclass
+
+from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
+from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
+
+
+@dataclass
+class GetDepthInput:
+    limit: int = 50
+
+
+class GetDepthUseCase:
+    """Fetch aggregated depth for the fixed QRL/USDT symbol."""
+
+    def __init__(self, settings: QrlSettings | None = None):
+        self._settings = settings or QrlSettings()
+
+    async def execute(self, data: GetDepthInput | None = None) -> dict:
+        payload = data or GetDepthInput()
+        client = QrlRestClient(self._settings)
+        async with client as cli:
+            return await cli.depth(limit=payload.limit)
+</file>
+
+<file path="src/app/application/market/use_cases/get_kline.py">
+"""
+Market use case: get kline data for QRL/USDT.
+"""
+
+from dataclasses import dataclass
+
+from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
+from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
+
+
+@dataclass
+class GetKlineInput:
+    interval: str = "1m"
+    limit: int = 50
+
+
+class GetKlineUseCase:
+    """Fetch klines for the fixed QRL/USDT symbol."""
+
+    def __init__(self, settings: QrlSettings | None = None):
+        self._settings = settings or QrlSettings()
+
+    async def execute(self, data: GetKlineInput | None = None) -> list:
+        payload = data or GetKlineInput()
+        client = QrlRestClient(self._settings)
+        async with client as cli:
+            return await cli.klines(interval=payload.interval, limit=payload.limit)
+</file>
+
+<file path="src/app/application/market/use_cases/get_stats24h.py">
+"""
+Market use case: 24h stats for QRL/USDT.
+"""
+
+from dataclasses import dataclass
+
+from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
+from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
+
+
+@dataclass
+class GetStats24hInput:
+    include_timestamp: bool = True
+
+
+class GetStats24hUseCase:
+    """Fetch 24h statistics for the fixed QRL/USDT symbol."""
+
+    def __init__(self, settings: QrlSettings | None = None):
+        self._settings = settings or QrlSettings()
+
+    async def execute(self, data: GetStats24hInput | None = None) -> dict:
+        client = QrlRestClient(self._settings)
+        async with client as cli:
+            return await cli.ticker_24h()
+</file>
+
+<file path="src/app/application/market/use_cases/get_ticker.py">
+"""
+Market use case: get ticker for QRL/USDT.
+"""
+
+from dataclasses import dataclass
+
+from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
+from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
+
+
+@dataclass
+class GetTickerInput:
+    include_timestamp: bool = True
+
+
+class GetTickerUseCase:
+    """Fetch 24h ticker for the fixed QRL/USDT symbol."""
+
+    def __init__(self, settings: QrlSettings | None = None):
+        self._settings = settings or QrlSettings()
+
+    async def execute(self, data: GetTickerInput | None = None) -> dict:
+        client = QrlRestClient(self._settings)
+        async with client as cli:
+            return await cli.ticker_24h()
 </file>
 
 <file path="src/app/application/ports/__init__.py">
@@ -2451,674 +2547,6 @@ if not _descriptor._USE_C_DESCRIPTORS:
 """Protocol buffer definitions for MEXC WebSocket APIs."""
 </file>
 
-<file path="src/app/infrastructure/exchange/mexc/proto/LICENSE">
-Apache License
-                           Version 2.0, January 2004
-                        http://www.apache.org/licenses/
-
-   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
-
-   1. Definitions.
-
-      "License" shall mean the terms and conditions for use, reproduction,
-      and distribution as defined by Sections 1 through 9 of this document.
-
-      "Licensor" shall mean the copyright owner or entity authorized by
-      the copyright owner that is granting the License.
-
-      "Legal Entity" shall mean the union of the acting entity and all
-      other entities that control, are controlled by, or are under common
-      control with that entity. For the purposes of this definition,
-      "control" means (i) the power, direct or indirect, to cause the
-      direction or management of such entity, whether by contract or
-      otherwise, or (ii) ownership of fifty percent (50%) or more of the
-      outstanding shares, or (iii) beneficial ownership of such entity.
-
-      "You" (or "Your") shall mean an individual or Legal Entity
-      exercising permissions granted by this License.
-
-      "Source" form shall mean the preferred form for making modifications,
-      including but not limited to software source code, documentation
-      source, and configuration files.
-
-      "Object" form shall mean any form resulting from mechanical
-      transformation or translation of a Source form, including but
-      not limited to compiled object code, generated documentation,
-      and conversions to other media types.
-
-      "Work" shall mean the work of authorship, whether in Source or
-      Object form, made available under the License, as indicated by a
-      copyright notice that is included in or attached to the work
-      (an example is provided in the Appendix below).
-
-      "Derivative Works" shall mean any work, whether in Source or Object
-      form, that is based on (or derived from) the Work and for which the
-      editorial revisions, annotations, elaborations, or other modifications
-      represent, as a whole, an original work of authorship. For the purposes
-      of this License, Derivative Works shall not include works that remain
-      separable from, or merely link (or bind by name) to the interfaces of,
-      the Work and Derivative Works thereof.
-
-      "Contribution" shall mean any work of authorship, including
-      the original version of the Work and any modifications or additions
-      to that Work or Derivative Works thereof, that is intentionally
-      submitted to Licensor for inclusion in the Work by the copyright owner
-      or by an individual or Legal Entity authorized to submit on behalf of
-      the copyright owner. For the purposes of this definition, "submitted"
-      means any form of electronic, verbal, or written communication sent
-      to the Licensor or its representatives, including but not limited to
-      communication on electronic mailing lists, source code control systems,
-      and issue tracking systems that are managed by, or on behalf of, the
-      Licensor for the purpose of discussing and improving the Work, but
-      excluding communication that is conspicuously marked or otherwise
-      designated in writing by the copyright owner as "Not a Contribution."
-
-      "Contributor" shall mean Licensor and any individual or Legal Entity
-      on behalf of whom a Contribution has been received by Licensor and
-      subsequently incorporated within the Work.
-
-   2. Grant of Copyright License. Subject to the terms and conditions of
-      this License, each Contributor hereby grants to You a perpetual,
-      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
-      copyright license to reproduce, prepare Derivative Works of,
-      publicly display, publicly perform, sublicense, and distribute the
-      Work and such Derivative Works in Source or Object form.
-
-   3. Grant of Patent License. Subject to the terms and conditions of
-      this License, each Contributor hereby grants to You a perpetual,
-      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
-      (except as stated in this section) patent license to make, have made,
-      use, offer to sell, sell, import, and otherwise transfer the Work,
-      where such license applies only to those patent claims licensable
-      by such Contributor that are necessarily infringed by their
-      Contribution(s) alone or by combination of their Contribution(s)
-      with the Work to which such Contribution(s) was submitted. If You
-      institute patent litigation against any entity (including a
-      cross-claim or counterclaim in a lawsuit) alleging that the Work
-      or a Contribution incorporated within the Work constitutes direct
-      or contributory patent infringement, then any patent licenses
-      granted to You under this License for that Work shall terminate
-      as of the date such litigation is filed.
-
-   4. Redistribution. You may reproduce and distribute copies of the
-      Work or Derivative Works thereof in any medium, with or without
-      modifications, and in Source or Object form, provided that You
-      meet the following conditions:
-
-      (a) You must give any other recipients of the Work or
-          Derivative Works a copy of this License; and
-
-      (b) You must cause any modified files to carry prominent notices
-          stating that You changed the files; and
-
-      (c) You must retain, in the Source form of any Derivative Works
-          that You distribute, all copyright, patent, trademark, and
-          attribution notices from the Source form of the Work,
-          excluding those notices that do not pertain to any part of
-          the Derivative Works; and
-
-      (d) If the Work includes a "NOTICE" text file as part of its
-          distribution, then any Derivative Works that You distribute must
-          include a readable copy of the attribution notices contained
-          within such NOTICE file, excluding those notices that do not
-          pertain to any part of the Derivative Works, in at least one
-          of the following places: within a NOTICE text file distributed
-          as part of the Derivative Works; within the Source form or
-          documentation, if provided along with the Derivative Works; or,
-          within a display generated by the Derivative Works, if and
-          wherever such third-party notices normally appear. The contents
-          of the NOTICE file are for informational purposes only and
-          do not modify the License. You may add Your own attribution
-          notices within Derivative Works that You distribute, alongside
-          or as an addendum to the NOTICE text from the Work, provided
-          that such additional attribution notices cannot be construed
-          as modifying the License.
-
-      You may add Your own copyright statement to Your modifications and
-      may provide additional or different license terms and conditions
-      for use, reproduction, or distribution of Your modifications, or
-      for any such Derivative Works as a whole, provided Your use,
-      reproduction, and distribution of the Work otherwise complies with
-      the conditions stated in this License.
-
-   5. Submission of Contributions. Unless You explicitly state otherwise,
-      any Contribution intentionally submitted for inclusion in the Work
-      by You to the Licensor shall be under the terms and conditions of
-      this License, without any additional terms or conditions.
-      Notwithstanding the above, nothing herein shall supersede or modify
-      the terms of any separate license agreement you may have executed
-      with Licensor regarding such Contributions.
-
-   6. Trademarks. This License does not grant permission to use the trade
-      names, trademarks, service marks, or product names of the Licensor,
-      except as required for reasonable and customary use in describing the
-      origin of the Work and reproducing the content of the NOTICE file.
-
-   7. Disclaimer of Warranty. Unless required by applicable law or
-      agreed to in writing, Licensor provides the Work (and each
-      Contributor provides its Contributions) on an "AS IS" BASIS,
-      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-      implied, including, without limitation, any warranties or conditions
-      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
-      PARTICULAR PURPOSE. You are solely responsible for determining the
-      appropriateness of using or redistributing the Work and assume any
-      risks associated with Your exercise of permissions under this License.
-
-   8. Limitation of Liability. In no event and under no legal theory,
-      whether in tort (including negligence), contract, or otherwise,
-      unless required by applicable law (such as deliberate and grossly
-      negligent acts) or agreed to in writing, shall any Contributor be
-      liable to You for damages, including any direct, indirect, special,
-      incidental, or consequential damages of any character arising as a
-      result of this License or out of the use or inability to use the
-      Work (including but not limited to damages for loss of goodwill,
-      work stoppage, computer failure or malfunction, or any and all
-      other commercial damages or losses), even if such Contributor
-      has been advised of the possibility of such damages.
-
-   9. Accepting Warranty or Additional Liability. While redistributing
-      the Work or Derivative Works thereof, You may choose to offer,
-      and charge a fee for, acceptance of support, warranty, indemnity,
-      or other liability obligations and/or rights consistent with this
-      License. However, in accepting such obligations, You may act only
-      on Your own behalf and on Your sole responsibility, not on behalf
-      of any other Contributor, and only if You agree to indemnify,
-      defend, and hold each Contributor harmless for any liability
-      incurred by, or claims asserted against, such Contributor by reason
-      of your accepting any such warranty or additional liability.
-
-   END OF TERMS AND CONDITIONS
-
-   APPENDIX: How to apply the Apache License to your work.
-
-      To apply the Apache License to your work, attach the following
-      boilerplate notice, with the fields enclosed by brackets "[]"
-      replaced with your own identifying information. (Don't include
-      the brackets!)  The text should be enclosed in the appropriate
-      comment syntax for the file format. We also recommend that a
-      file or class name and description of purpose be included on the
-      same "printed page" as the copyright notice for easier
-      identification within third-party archives.
-
-   Copyright [yyyy] [name of copyright owner]
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PrivateAccountV3Api.proto">
-// spot@public.cny.v2.pb
-
-syntax = "proto3";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PrivateAccountV3ApiProto";
-
-message PrivateAccountV3Api {
-
-  string vcoinName = 1;
-  string coinId = 2;
-
-  string balanceAmount = 3;
-  string balanceAmountChange = 4;
-  string frozenAmount = 5;
-  string frozenAmountChange = 6;
-
-  string type = 7;
-
-  int64 time = 8;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PrivateDealsV3Api.proto">
-// spot@private.deals.v3.api.pb
-
-syntax = "proto3";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PrivateDealsV3ApiProto";
-
-message PrivateDealsV3Api {
-
-  string price = 1;
-  string quantity = 2;
-  string amount = 3;
-
-  int32 tradeType = 4;
-  bool isMaker = 5;
-  bool isSelfTrade = 6;
-
-  string tradeId = 7;
-  string clientOrderId = 8;
-  string orderId = 9;
-
-  string feeAmount = 10;
-  string feeCurrency = 11;
-
-  int64 time = 12;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PrivateOrdersV3Api.proto">
-// spot@private.orders.v3.api.pb
-
-syntax = "proto3";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PrivateOrdersV3ApiProto";
-
-message PrivateOrdersV3Api {
-
-  string id = 1;
-  string clientId = 2;
-
-  string price = 3;
-  string quantity = 4;
-  string amount = 5;
-  string avgPrice = 6;
-
-  int32 orderType = 7;
-  int32 tradeType = 8;
-  bool isMaker = 9;
-
-  string remainAmount = 10;
-  string remainQuantity= 11;
-  optional string lastDealQuantity = 12;
-  string cumulativeQuantity = 13;
-  string cumulativeAmount = 14;
-
-  int32 status = 15;
-  int64 createTime = 16;
-
-  optional string market = 17;
-  optional int32 triggerType = 18;
-  optional string triggerPrice= 19;
-  optional int32 state = 20;
-
-  optional string ocoId = 21;
-  optional string routeFactor = 22;
-
-  optional string symbolId = 23;
-  optional string marketId = 24;
-
-  optional string marketCurrencyId = 25;
-  optional string currencyId = 26;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PublicAggreBookTickerV3Api.proto">
-// spot@public.aggre.bookTicker.v3.api.pb
-
-syntax = "proto3";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PublicAggreBookTickerV3ApiProto";
-
-message PublicAggreBookTickerV3Api {
-
-  string bidPrice = 1;
-  string bidQuantity = 2;
-  string askPrice = 3;
-  string askQuantity = 4;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PublicAggreDealsV3Api.proto">
-// spot@public.aggre.deals.v3.api.pb
-
-syntax = "proto3";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PublicAggreDealsV3ApiProto";
-
-message PublicAggreDealsV3Api {
-
-  repeated PublicAggreDealsV3ApiItem deals  = 1;
-  string eventType = 2;
-}
-
-message PublicAggreDealsV3ApiItem {
-  string price = 1;
-  string quantity = 2;
-  int32 tradeType = 3;
-  int64 time = 4;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PublicAggreDepthsV3Api.proto">
-// spot@public.aggre.depth.v3.api.pb@aggreType
-
-syntax = "proto3";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PublicAggreDepthsV3ApiProto";
-
-message PublicAggreDepthsV3Api {
-
-  repeated PublicAggreDepthV3ApiItem asks  = 1;
-  repeated PublicAggreDepthV3ApiItem bids  = 2;
-  string eventType = 3;
-  string fromVersion = 4;
-  string toVersion = 5;
-}
-
-message PublicAggreDepthV3ApiItem {
-  string price = 1;
-  string quantity = 2;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PublicBookTickerBatchV3Api.proto">
-// spot@public.bookTicker.v3.api.pb
-
-syntax = "proto3";
-import "PublicBookTickerV3Api.proto";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PublicBookTickerBatchV3ApiProto";
-
-message PublicBookTickerBatchV3Api {
-  repeated PublicBookTickerV3Api items  = 1;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PublicBookTickerV3Api.proto">
-// spot@public.bookTicker.v3.api.pb
-
-syntax = "proto3";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PublicBookTickerV3ApiProto";
-
-message PublicBookTickerV3Api {
-
-  string bidPrice = 1;
-  string bidQuantity = 2;
-  string askPrice = 3;
-  string askQuantity = 4;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PublicDealsV3Api.proto">
-// spot@public.deals.v3.api.pb
-
-syntax = "proto3";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PublicDealsV3ApiProto";
-
-message PublicDealsV3Api {
-
-  repeated PublicDealsV3ApiItem deals  = 1;
-  string eventType = 2;
-}
-
-message PublicDealsV3ApiItem {
-  string price = 1;
-  string quantity = 2;
-  int32 tradeType = 3;
-  int64 time = 4;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PublicIncreaseDepthsBatchV3Api.proto">
-// spot@public.increase.depth.v3.api.pb
-
-syntax = "proto3";
-import "PublicIncreaseDepthsV3Api.proto";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PublicIncreaseDepthsBatchV3ApiProto";
-
-message PublicIncreaseDepthsBatchV3Api{
-
-  repeated PublicIncreaseDepthsV3Api items  = 1;
-  string eventType = 2;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PublicIncreaseDepthsV3Api.proto">
-// spot@public.increase.depth.v3.api.pb
-
-syntax = "proto3";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PublicIncreaseDepthsV3ApiProto";
-
-message PublicIncreaseDepthsV3Api {
-
-  repeated PublicIncreaseDepthV3ApiItem asks  = 1;
-  repeated PublicIncreaseDepthV3ApiItem bids  = 2;
-  string eventType = 3;
-  string version = 4;
-}
-
-message PublicIncreaseDepthV3ApiItem {
-  string price = 1;
-  string quantity = 2;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PublicLimitDepthsV3Api.proto">
-// spot@public.limit.depth.v3.api.pb
-
-syntax = "proto3";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PublicLimitDepthsV3ApiProto";
-
-message PublicLimitDepthsV3Api {
-
-  repeated PublicLimitDepthV3ApiItem asks  = 1;
-  repeated PublicLimitDepthV3ApiItem bids  = 2;
-  string eventType = 3;
-  string version = 4;
-}
-
-message PublicLimitDepthV3ApiItem {
-  string price = 1;
-  string quantity = 2;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PublicMiniTickersV3Api.proto">
-// spot@public.miniTickers.v3.api
-
-syntax = "proto3";
-
-import "PublicMiniTickerV3Api.proto";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PublicMiniTickersV3ApiProto";
-
-message PublicMiniTickersV3Api {
-
-  repeated PublicMiniTickerV3Api items  = 1;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PublicMiniTickerV3Api.proto">
-// spot@public.miniTicker.v3.api
-
-syntax = "proto3";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PublicMiniTickerV3ApiProto";
-
-message PublicMiniTickerV3Api {
-
-  // 交易对名
-  string symbol = 1;
-  // 最新价格
-  string price = 2;
-  // utc+8时区涨跌幅
-  string rate = 3;
-  // 时区涨跌幅
-  string zonedRate = 4;
-  // 滚动最高价
-  string high = 5;
-  // 滚动最低价
-  string low = 6;
-  // 滚动成交额
-  string volume = 7;
-  // 滚动成交量
-  string quantity = 8;
-  // utc+8时区上期收盘价模式涨跌幅
-  string lastCloseRate = 9;
-  // 上期收盘价模式时区涨跌幅
-  string lastCloseZonedRate = 10;
-  // 上期收盘价模式滚动最高价
-  string lastCloseHigh = 11;
-  // 上期收盘价模式滚动最低价
-  string lastCloseLow = 12;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PublicSpotKlineV3Api.proto">
-// spot@public.kline.v3.api.pb@<symbol>@<interval>
-
-syntax = "proto3";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PublicSpotKlineV3ApiProto";
-
-message PublicSpotKlineV3Api {
-  //K线周期(Min1,Min5,Min15,Min30,Min60,Hour4,Hour8,Day1,Week1,Month1)
-  string interval = 1;
-  // 窗口开始时间戳(秒时间戳)
-  int64 windowStart = 2;
-  // 开盘价
-  string openingPrice = 3;
-  // 收盘价
-  string closingPrice = 4;
-  // 最高价
-  string highestPrice = 5;
-  // 最低价
-  string lowestPrice = 6;
-  // 成交量
-  string volume = 7;
-  // 成交额
-  string amount = 8;
-  // 窗口结束时间戳(秒时间戳)
-  int64 windowEnd = 9;
-}
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/proto/PushDataV3ApiWrapper.proto">
-syntax = "proto3";
-
-import "PublicDealsV3Api.proto";
-import "PublicIncreaseDepthsV3Api.proto";
-import "PublicLimitDepthsV3Api.proto";
-import "PrivateOrdersV3Api.proto";
-import "PublicBookTickerV3Api.proto";
-import "PrivateDealsV3Api.proto";
-import "PrivateAccountV3Api.proto";
-import "PublicSpotKlineV3Api.proto";
-import "PublicMiniTickerV3Api.proto";
-import "PublicMiniTickersV3Api.proto";
-import "PublicBookTickerBatchV3Api.proto";
-import "PublicIncreaseDepthsBatchV3Api.proto";
-import "PublicAggreDepthsV3Api.proto";
-import "PublicAggreDealsV3Api.proto";
-import "PublicAggreBookTickerV3Api.proto";
-
-option java_package = "com.mxc.push.common.protobuf";
-option optimize_for = SPEED;
-option java_multiple_files = true;
-option java_outer_classname = "PushDataV3ApiWrapperProto";
-
-message PushDataV3ApiWrapper {
-
-
-  /**
-   * 频道
-   */
-  string channel = 1;
-
-  /**
-   * 数据，NOTE：因为不能重复，所以类型和变量名尽量使用全名
-   */
-  oneof body {
-    PublicDealsV3Api publicDeals = 301;
-    PublicIncreaseDepthsV3Api publicIncreaseDepths = 302;
-    PublicLimitDepthsV3Api publicLimitDepths = 303;
-    PrivateOrdersV3Api privateOrders = 304;
-    PublicBookTickerV3Api publicBookTicker = 305;
-    PrivateDealsV3Api privateDeals = 306;
-    PrivateAccountV3Api privateAccount = 307;
-    PublicSpotKlineV3Api publicSpotKline = 308;
-    PublicMiniTickerV3Api publicMiniTicker = 309;
-    PublicMiniTickersV3Api publicMiniTickers = 310;
-    PublicBookTickerBatchV3Api publicBookTickerBatch = 311;
-    PublicIncreaseDepthsBatchV3Api publicIncreaseDepthsBatch = 312;
-    PublicAggreDepthsV3Api publicAggreDepths = 313;
-    PublicAggreDealsV3Api publicAggreDeals = 314;
-    PublicAggreBookTickerV3Api publicAggreBookTicker = 315;
-  }
-
-  /**
-   * 交易对
-   */
-  optional string symbol = 3;
-
-  /**
-   * 交易对ID
-   */
-  optional string symbolId = 4;
-
-  /**
-   * 消息生成时间
-   */
-  optional int64 createTime = 5;
-
-  /**
-   * 消息推送时间
-   */
-  optional int64 sendTime = 6;
-
-}
-</file>
-
 <file path="src/app/infrastructure/exchange/mexc/qrl/__init__.py">
 # QRL/USDT dedicated infrastructure components
 </file>
@@ -3545,14 +2973,6 @@ async def order_stream(websocket: WebSocket):
 """HTML page controllers."""
 </file>
 
-<file path="src/app/interfaces/http/pages/static/css/.gitkeep">
-
-</file>
-
-<file path="src/app/interfaces/http/pages/static/js/.gitkeep">
-
-</file>
-
 <file path="src/app/interfaces/tasks/__init__.py">
 """Task interfaces placeholder."""
 </file>
@@ -3904,65 +3324,6 @@ class GetQrlPrice:
         )
 </file>
 
-<file path="src/app/application/market/use_cases/get_depth.py">
-"""
-Market use case: get order book depth for QRL/USDT.
-"""
-
-from dataclasses import dataclass
-
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
-
-
-@dataclass
-class GetDepthInput:
-    limit: int = 50
-
-
-class GetDepthUseCase:
-    """Fetch aggregated depth for the fixed QRL/USDT symbol."""
-
-    def __init__(self, settings: QrlSettings | None = None):
-        self._settings = settings or QrlSettings()
-
-    async def execute(self, data: GetDepthInput | None = None) -> dict:
-        payload = data or GetDepthInput()
-        client = QrlRestClient(self._settings)
-        async with client as cli:
-            return await cli.depth(limit=payload.limit)
-</file>
-
-<file path="src/app/application/market/use_cases/get_kline.py">
-"""
-Market use case: get kline data for QRL/USDT.
-"""
-
-from dataclasses import dataclass
-
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
-
-
-@dataclass
-class GetKlineInput:
-    interval: str = "1m"
-    limit: int = 50
-
-
-class GetKlineUseCase:
-    """Fetch klines for the fixed QRL/USDT symbol."""
-
-    def __init__(self, settings: QrlSettings | None = None):
-        self._settings = settings or QrlSettings()
-
-    async def execute(self, data: GetKlineInput | None = None) -> list:
-        payload = data or GetKlineInput()
-        client = QrlRestClient(self._settings)
-        async with client as cli:
-            return await cli.klines(interval=payload.interval, limit=payload.limit)
-</file>
-
 <file path="src/app/application/market/use_cases/get_market_trades.py">
 """
 Market use case: recent public trades for QRL/USDT.
@@ -3992,166 +3353,44 @@ class GetMarketTradesUseCase:
             return await cli.market_trades(limit=payload.limit)
 </file>
 
-<file path="src/app/application/market/use_cases/get_stats24h.py">
-"""
-Market use case: 24h stats for QRL/USDT.
-"""
-
-from dataclasses import dataclass
-
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
+<file path="src/app/application/trading/dtos.py">
+from dataclasses import asdict, dataclass
 
 
-@dataclass
-class GetStats24hInput:
-    include_timestamp: bool = True
-
-
-class GetStats24hUseCase:
-    """Fetch 24h statistics for the fixed QRL/USDT symbol."""
-
-    def __init__(self, settings: QrlSettings | None = None):
-        self._settings = settings or QrlSettings()
-
-    async def execute(self, data: GetStats24hInput | None = None) -> dict:
-        client = QrlRestClient(self._settings)
-        async with client as cli:
-            return await cli.ticker_24h()
-</file>
-
-<file path="src/app/application/market/use_cases/get_ticker.py">
-"""
-Market use case: get ticker for QRL/USDT.
-"""
-
-from dataclasses import dataclass
-
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
-
-
-@dataclass
-class GetTickerInput:
-    include_timestamp: bool = True
-
-
-class GetTickerUseCase:
-    """Fetch 24h ticker for the fixed QRL/USDT symbol."""
-
-    def __init__(self, settings: QrlSettings | None = None):
-        self._settings = settings or QrlSettings()
-
-    async def execute(self, data: GetTickerInput | None = None) -> dict:
-        client = QrlRestClient(self._settings)
-        async with client as cli:
-            return await cli.ticker_24h()
-</file>
-
-<file path="src/app/application/trading/use_cases/list_trades.py">
-"""Trading use case: list trades for QRL/USDT."""
-
-from src.app.application.exchange.mexc_service import MexcService, build_mexc_service
-from src.app.domain.entities.trade import Trade
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
-
-
-def _serialize_trade(trade: Trade) -> dict:
-    return {
-        "trade_id": trade.trade_id.value,
-        "order_id": trade.order_id.value,
-        "symbol": trade.symbol.value,
-        "side": trade.side.value,
-        "price": str(trade.price.value),
-        "quantity": str(trade.quantity.value),
-        "fee": str(trade.fee) if trade.fee is not None else None,
-        "fee_asset": trade.fee_asset,
-        "timestamp": trade.timestamp.value.isoformat(),
-    }
-
-
-class ListTradesUseCase:
-    settings: MexcSettings | None = None
-
-    def __init__(self, settings: MexcSettings | None = None):
-        self.settings = settings
-
-    async def execute(self, symbol: str) -> list[dict]:
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            trades = await svc.list_trades(Symbol(symbol))
-        return [_serialize_trade(trade) for trade in trades]
-</file>
-
-<file path="src/app/application/trading/use_cases/place_order.py">
-"""Trading use case: place order for QRL/USDT."""
-
-from dataclasses import dataclass
-from decimal import Decimal
-
-from src.app.application.exchange.mexc_service import MexcService, PlaceOrderRequest, build_mexc_service
-from src.app.domain.entities.order import Order
-from src.app.domain.value_objects.order_type import OrderType
-from src.app.domain.value_objects.price import Price
-from src.app.domain.value_objects.quantity import Quantity
-from src.app.domain.value_objects.side import Side
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.time_in_force import TimeInForce
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
-
-
-def _serialize_order(order: Order) -> dict:
-    return {
-        "order_id": order.order_id.value,
-        "symbol": order.symbol.value,
-        "side": order.side.value,
-        "type": order.order_type.value,
-        "status": order.status.value,
-        "price": str(order.price.value) if order.price else None,
-        "quantity": str(order.quantity.value),
-        "executed_quantity": str(order.executed_quantity) if order.executed_quantity else None,
-        "cumulative_quote_quantity": str(order.cumulative_quote_quantity)
-        if order.cumulative_quote_quantity
-        else None,
-        "time_in_force": order.time_in_force.value if order.time_in_force else None,
-        "client_order_id": order.client_order_id,
-        "created_at": order.created_at.value.isoformat(),
-        "updated_at": order.updated_at.value.isoformat() if order.updated_at else None,
-    }
-
-
-@dataclass
-class PlaceOrderInput:
+@dataclass(frozen=True)
+class OrderDTO:
+    order_id: str
     symbol: str
     side: str
-    quantity: Decimal
-    price: Decimal | None
-    order_type: str = "LIMIT"
-    time_in_force: str = "GTC"
-    client_order_id: str | None = None
+    type: str
+    status: str
+    price: str | None
+    quantity: str
+    executed_quantity: str | None
+    cumulative_quote_quantity: str | None
+    client_order_id: str | None
+    created_at: str
+    updated_at: str | None
+    time_in_force: str | None = None
+
+    def to_dict(self) -> dict:
+        return asdict(self)
 
 
-class PlaceOrderUseCase:
-    settings: MexcSettings | None = None
+@dataclass(frozen=True)
+class TradeDTO:
+    trade_id: str
+    order_id: str
+    symbol: str
+    side: str
+    price: str
+    quantity: str
+    fee: str | None
+    fee_asset: str | None
+    timestamp: str
 
-    def __init__(self, settings: MexcSettings | None = None):
-        self.settings = settings
-
-    async def execute(self, data: PlaceOrderInput) -> dict:
-        request = PlaceOrderRequest(
-            symbol=Symbol(data.symbol),
-            side=Side(data.side),
-            order_type=OrderType(data.order_type),
-            quantity=Quantity(data.quantity),
-            price=Price.from_single(data.price) if data.price is not None else None,
-            time_in_force=TimeInForce(data.time_in_force) if data.time_in_force else None,
-            client_order_id=data.client_order_id,
-        )
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            order = await svc.place_order(request)
-        return _serialize_order(order)
+    def to_dict(self) -> dict:
+        return asdict(self)
 </file>
 
 <file path="src/app/domain/aggregates/__init__.py">
@@ -4563,6 +3802,57 @@ class SlippageAssessment:
     reason: str | None = None
 </file>
 
+<file path="src/app/interfaces/http/api/market_routes.py">
+from fastapi import APIRouter, Query
+
+from src.app.application.market.use_cases.get_depth import GetDepthUseCase
+from src.app.application.market.use_cases.get_kline import GetKlineUseCase
+from src.app.application.market.use_cases.get_market_trades import GetMarketTradesInput, GetMarketTradesUseCase
+from src.app.application.market.use_cases.get_stats24h import GetStats24hUseCase
+from src.app.application.market.use_cases.get_ticker import GetTickerUseCase
+
+router = APIRouter()
+
+
+@router.get("/depth")
+async def get_depth(limit: int = Query(default=50, ge=5, le=1000)):
+    """Get order book depth for QRL/USDT."""
+    usecase = GetDepthUseCase()
+    from src.app.application.market.use_cases.get_depth import GetDepthInput
+
+    return await usecase.execute(data=GetDepthInput(limit=limit))
+
+
+@router.get("/ticker")
+async def get_ticker():
+    """Get ticker for QRL/USDT."""
+    usecase = GetTickerUseCase()
+    return await usecase.execute()
+
+
+@router.get("/kline")
+async def get_kline(interval: str = Query(default="1m"), limit: int = Query(default=50, ge=1, le=500)):
+    """Get kline data for QRL/USDT."""
+    usecase = GetKlineUseCase()
+    from src.app.application.market.use_cases.get_kline import GetKlineInput
+
+    return await usecase.execute(data=GetKlineInput(interval=interval, limit=limit))
+
+
+@router.get("/stats24h")
+async def get_stats_24h():
+    """Get 24h statistics for QRL/USDT."""
+    usecase = GetStats24hUseCase()
+    return await usecase.execute()
+
+
+@router.get("/trades")
+async def get_market_trades(limit: int = Query(default=50, ge=1, le=500)):
+    """Get recent public trades for QRL/USDT."""
+    usecase = GetMarketTradesUseCase()
+    return await usecase.execute(data=GetMarketTradesInput(limit=limit))
+</file>
+
 <file path="src/app/interfaces/http/pages/dashboard_routes.py">
 from pathlib import Path
 from typing import Any
@@ -4936,6 +4226,116 @@ if __name__ == "__main__":
 __all__ = ["app"]
 </file>
 
+<file path="src/app/application/trading/use_cases/list_trades.py">
+"""Trading use case: list trades for QRL/USDT."""
+
+from src.app.application.exchange.mexc_service import MexcService, build_mexc_service
+from src.app.application.trading.dtos import TradeDTO
+from src.app.domain.entities.trade import Trade
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.infrastructure.exchange.mexc.settings import MexcSettings
+
+
+def _serialize_trade(trade: Trade) -> dict:
+    dto = TradeDTO(
+        trade_id=trade.trade_id.value,
+        order_id=trade.order_id.value,
+        symbol=trade.symbol.value,
+        side=trade.side.value,
+        price=str(trade.price.value),
+        quantity=str(trade.quantity.value),
+        fee=str(trade.fee) if trade.fee is not None else None,
+        fee_asset=trade.fee_asset,
+        timestamp=trade.timestamp.value.isoformat(),
+    )
+    return dto.to_dict()
+
+
+class ListTradesUseCase:
+    settings: MexcSettings | None = None
+
+    def __init__(self, settings: MexcSettings | None = None):
+        self.settings = settings
+
+    async def execute(self, symbol: str) -> list[dict]:
+        service = build_mexc_service(self.settings or MexcSettings())
+        async with service as svc:
+            trades = await svc.list_trades(Symbol(symbol))
+        return [_serialize_trade(trade) for trade in trades]
+</file>
+
+<file path="src/app/application/trading/use_cases/place_order.py">
+"""Trading use case: place order for QRL/USDT."""
+
+from dataclasses import dataclass
+from decimal import Decimal
+
+from src.app.application.exchange.mexc_service import MexcService, PlaceOrderRequest, build_mexc_service
+from src.app.application.trading.dtos import OrderDTO
+from src.app.domain.entities.order import Order
+from src.app.domain.value_objects.order_type import OrderType
+from src.app.domain.value_objects.price import Price
+from src.app.domain.value_objects.quantity import Quantity
+from src.app.domain.value_objects.side import Side
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.time_in_force import TimeInForce
+from src.app.infrastructure.exchange.mexc.settings import MexcSettings
+
+
+def _serialize_order(order: Order) -> dict:
+    dto = OrderDTO(
+        order_id=order.order_id.value,
+        symbol=order.symbol.value,
+        side=order.side.value,
+        type=order.order_type.value,
+        status=order.status.value,
+        price=str(order.price.value) if order.price else None,
+        quantity=str(order.quantity.value),
+        executed_quantity=str(order.executed_quantity) if order.executed_quantity else None,
+        cumulative_quote_quantity=str(order.cumulative_quote_quantity)
+        if order.cumulative_quote_quantity
+        else None,
+        client_order_id=order.client_order_id,
+        created_at=order.created_at.value.isoformat(),
+        updated_at=order.updated_at.value.isoformat() if order.updated_at else None,
+        time_in_force=order.time_in_force.value if order.time_in_force else None,
+    )
+    return dto.to_dict()
+
+
+@dataclass
+class PlaceOrderInput:
+    symbol: str
+    side: str
+    quantity: Decimal
+    price: Decimal | None
+    order_type: str = "LIMIT"
+    time_in_force: str = "GTC"
+    client_order_id: str | None = None
+
+
+class PlaceOrderUseCase:
+    settings: MexcSettings | None = None
+
+    def __init__(self, settings: MexcSettings | None = None):
+        self.settings = settings
+
+    async def execute(self, data: PlaceOrderInput) -> dict:
+        request = PlaceOrderRequest(
+            symbol=Symbol(data.symbol),
+            side=Side(data.side),
+            order_type=OrderType(data.order_type),
+            quantity=Quantity(data.quantity),
+            price=Price.from_single(data.price) if data.price is not None else None,
+            time_in_force=TimeInForce(data.time_in_force) if data.time_in_force else None,
+            client_order_id=data.client_order_id,
+        )
+        service = build_mexc_service(self.settings or MexcSettings())
+        async with service as svc:
+            order = await svc.place_order(request)
+        return _serialize_order(order)
+</file>
+
 <file path="src/app/domain/services/balance_comparison_rule.py">
 from decimal import Decimal
 
@@ -5218,55 +4618,134 @@ class MexcSettings(BaseSettings):
         return cleaned
 </file>
 
-<file path="src/app/interfaces/http/api/market_routes.py">
-from fastapi import APIRouter, Query
+<file path="src/app/interfaces/http/api/qrl_routes.py">
+import asyncio
+from decimal import Decimal
 
-from src.app.application.market.use_cases.get_depth import GetDepthUseCase
-from src.app.application.market.use_cases.get_kline import GetKlineUseCase
-from src.app.application.market.use_cases.get_market_trades import GetMarketTradesInput, GetMarketTradesUseCase
-from src.app.application.market.use_cases.get_stats24h import GetStats24hUseCase
-from src.app.application.market.use_cases.get_ticker import GetTickerUseCase
+from fastapi import APIRouter, HTTPException, Query
+
+from src.app.application.market.qrl.get_qrl_depth import GetQrlDepth
+from src.app.application.market.qrl.get_qrl_kline import GetQrlKline
+from src.app.application.market.qrl.get_qrl_price import GetQrlPrice
+from src.app.application.market.use_cases.get_market_trades import GetMarketTradesUseCase
+from src.app.application.trading.qrl.cancel_qrl_order import CancelQrlOrder
+from src.app.application.trading.qrl.get_qrl_order import GetQrlOrder
+from src.app.application.trading.qrl.place_qrl_order import PlaceQrlOrder
+from src.app.application.account.use_cases.get_balance import GetBalanceUseCase
+from src.app.application.trading.use_cases.list_orders import ListOrdersUseCase
+from src.app.application.trading.use_cases.list_trades import ListTradesUseCase
+from src.app.domain.value_objects.qrl_price import QrlPrice
+from src.app.domain.value_objects.qrl_quantity import QrlQuantity
+from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
+from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
+from src.app.interfaces.http.schemas import PlaceOrderRequest
 
 router = APIRouter()
 
 
-@router.get("/depth")
-async def get_depth(limit: int = Query(default=50, ge=5, le=1000)):
-    """Get order book depth for QRL/USDT."""
-    usecase = GetDepthUseCase()
-    from src.app.application.market.use_cases.get_depth import GetDepthInput
-
-    return await usecase.execute(data=GetDepthInput(limit=limit))
+def _client() -> QrlRestClient:
+    return QrlRestClient(QrlSettings())
 
 
-@router.get("/ticker")
-async def get_ticker():
-    """Get ticker for QRL/USDT."""
-    usecase = GetTickerUseCase()
-    return await usecase.execute()
+@router.get("/price")
+async def qrl_price():
+    usecase = GetQrlPrice(_client())
+    try:
+        snapshot = await usecase.execute()
+        return snapshot.to_dict()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL price: {exc}") from exc
 
 
 @router.get("/kline")
-async def get_kline(interval: str = Query(default="1m"), limit: int = Query(default=50, ge=1, le=500)):
-    """Get kline data for QRL/USDT."""
-    usecase = GetKlineUseCase()
-    from src.app.application.market.use_cases.get_kline import GetKlineInput
-
-    return await usecase.execute(data=GetKlineInput(interval=interval, limit=limit))
-
-
-@router.get("/stats24h")
-async def get_stats_24h():
-    """Get 24h statistics for QRL/USDT."""
-    usecase = GetStats24hUseCase()
-    return await usecase.execute()
+async def qrl_kline(interval: str = Query(default="1m"), limit: int = Query(default=50, ge=1, le=500)):
+    usecase = GetQrlKline(_client(), interval=interval, limit=limit)
+    try:
+        raw = await usecase.execute()
+        normalized = [
+            {"timestamp": item[0], "open": item[1], "high": item[2], "low": item[3], "close": item[4], "volume": item[5]}
+            for item in raw
+        ]
+        return normalized
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL klines: {exc}") from exc
 
 
-@router.get("/trades")
-async def get_market_trades(limit: int = Query(default=50, ge=1, le=500)):
-    """Get recent public trades for QRL/USDT."""
-    usecase = GetMarketTradesUseCase()
-    return await usecase.execute(data=GetMarketTradesInput(limit=limit))
+@router.get("/depth")
+async def qrl_depth(limit: int = Query(default=50, ge=5, le=1000)):
+    usecase = GetQrlDepth(_client(), limit=limit)
+    try:
+        return await usecase.execute()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL depth: {exc}") from exc
+
+
+@router.post("/orders")
+async def qrl_place_order(request: PlaceOrderRequest):
+    usecase = PlaceQrlOrder(_client())
+    price_vo = QrlPrice(request.price) if request.price is not None else None
+    qty_vo = QrlQuantity(request.quantity)
+    return await usecase.execute(
+        side=request.side,
+        order_type=request.order_type,
+        price=price_vo,
+        quantity=qty_vo,
+        time_in_force=request.time_in_force,
+        client_order_id=request.client_order_id,
+    )
+
+
+@router.post("/orders/{order_id}/cancel")
+async def qrl_cancel_order(order_id: str):
+    usecase = CancelQrlOrder(_client())
+    return await usecase.execute(order_id=order_id, client_order_id=None)
+
+
+@router.get("/orders/{order_id}")
+async def qrl_get_order(order_id: str):
+    usecase = GetQrlOrder(_client())
+    return await usecase.execute(order_id=order_id, client_order_id=None)
+
+
+@router.get("/summary")
+async def qrl_summary(
+    interval: str = Query(default="1m"),
+    kline_limit: int = Query(default=50, ge=1, le=500),
+    depth_limit: int = Query(default=50, ge=5, le=1000),
+    trades_limit: int = Query(default=50, ge=1, le=500),
+):
+    """Aggregate price, kline, depth, and balance for dashboard consumption."""
+    price_uc = GetQrlPrice(_client())
+    kline_uc = GetQrlKline(_client(), interval=interval, limit=kline_limit)
+    depth_uc = GetQrlDepth(_client(), limit=depth_limit)
+    balance_uc = GetBalanceUseCase()
+    orders_uc = ListOrdersUseCase()
+    trades_uc = ListTradesUseCase()
+    market_trades_uc = GetMarketTradesUseCase()
+
+    price_result, kline_result, depth_result, balance_result, orders, trades, market_trades = await asyncio.gather(
+        price_uc.execute(),
+        kline_uc.execute(),
+        depth_uc.execute(),
+        balance_uc.execute(),
+        orders_uc.execute(symbol="QRLUSDT"),
+        trades_uc.execute("QRLUSDT"),
+        market_trades_uc.execute(),
+    )
+
+    normalized_klines = [
+        {"timestamp": item[0], "open": item[1], "high": item[2], "low": item[3], "close": item[4], "volume": item[5]}
+        for item in kline_result
+    ]
+    return {
+        "price": price_result.to_dict(),
+        "klines": normalized_klines,
+        "depth": depth_result,
+        "balance": balance_result,
+        "orders": orders,
+        "trades": trades,
+        "market_trades": market_trades[:trades_limit],
+    }
 </file>
 
 <file path="src/app/interfaces/http/pages/static/js/domain/order.js">
@@ -5523,6 +5002,133 @@ def orders_from_private_proto(
     return orders
 </file>
 
+<file path="src/app/infrastructure/exchange/mexc/mappers.py">
+"""Mapping helpers between MEXC API payloads and domain objects."""
+
+from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
+from typing import Any
+
+from src.app.domain.entities.account import Account
+from src.app.domain.entities.order import Order
+from src.app.domain.entities.trade import Trade
+from src.app.domain.value_objects.balance import Balance
+from src.app.domain.value_objects.order_book import DepthLevel, OrderBook
+from src.app.domain.value_objects.order_id import OrderId
+from src.app.domain.value_objects.order_status import OrderStatus
+from src.app.domain.value_objects.order_type import OrderType
+from src.app.domain.value_objects.quantity import Quantity
+from src.app.domain.value_objects.side import Side
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.time_in_force import TimeInForce
+from src.app.domain.value_objects.timestamp import Timestamp
+from src.app.domain.value_objects.trade_id import TradeId
+from src.app.domain.value_objects.qrl_price import QrlPrice
+
+
+def _to_decimal(value: Any) -> Decimal:
+    return Decimal(str(value))
+
+
+def _to_timestamp_from_ms(value: int | float | str) -> Timestamp:
+    if value in (None, "", 0):
+        ms_value = 0
+    else:
+        try:
+            ms_value = int(value)
+        except (TypeError, ValueError):
+            ms_value = 0
+    dt = datetime.fromtimestamp(ms_value / 1000, tz=timezone.utc)
+    return Timestamp(dt)
+
+
+def server_time_to_timestamp(payload: dict[str, Any]) -> Timestamp:
+    return _to_timestamp_from_ms(payload.get("serverTime", 0))
+
+
+def account_from_api(payload: dict[str, Any]) -> Account:
+    balances = [
+        Balance(asset=item["asset"], free=_to_decimal(item["free"]), locked=_to_decimal(item["locked"]))
+        for item in payload.get("balances", [])
+    ]
+    return Account(
+        can_trade=bool(payload.get("canTrade", True)),
+        update_time=_to_timestamp_from_ms(payload.get("updateTime", 0)),
+        balances=balances,
+    )
+
+
+def order_from_api(payload: dict[str, Any]) -> Order:
+    order_id_value = payload.get("orderId")
+    if order_id_value is None:
+        raise ValueError("orderId is required in MEXC response")
+    price_raw = payload.get("price", payload.get("origPrice"))
+    price_vo: QrlPrice | None = None
+    if price_raw not in (None, "", 0, "0"):
+        try:
+            price_vo = QrlPrice(_to_decimal(price_raw))
+        except (InvalidOperation, ValueError):
+            price_vo = None
+    return Order(
+        order_id=OrderId(str(order_id_value)),
+        symbol=Symbol(payload.get("symbol", "QRLUSDT")),
+        side=Side(payload.get("side", "BUY")),
+        order_type=OrderType(payload.get("type", "LIMIT")),
+        status=OrderStatus(payload.get("status", "NEW")),
+        price=price_vo,
+        quantity=Quantity(_to_decimal(payload.get("origQty", payload.get("quantity", "0.00000001")))),
+        time_in_force=TimeInForce(payload["timeInForce"]) if payload.get("timeInForce") else None,
+        created_at=_to_timestamp_from_ms(payload.get("transactTime", payload.get("createTime", 0))),
+        client_order_id=payload.get("clientOrderId") or payload.get("origClientOrderId"),
+        executed_quantity=_to_decimal(payload.get("executedQty", "0"))
+        if payload.get("executedQty") is not None
+        else None,
+        cumulative_quote_quantity=_to_decimal(payload.get("cummulativeQuoteQty", "0"))
+        if payload.get("cummulativeQuoteQty") is not None
+        else None,
+        updated_at=_to_timestamp_from_ms(payload["updateTime"]) if payload.get("updateTime") else None,
+    )
+
+
+def trade_from_api(payload: dict[str, Any]) -> Trade:
+    return Trade(
+        trade_id=TradeId(str(payload.get("id"))),
+        order_id=OrderId(str(payload.get("orderId"))),
+        symbol=Symbol(payload.get("symbol", "QRLUSDT")),
+        side=Side("BUY" if payload.get("isBuyer") else "SELL"),
+        price=QrlPrice(_to_decimal(payload.get("price", "0"))),
+        quantity=Quantity(_to_decimal(payload.get("qty", payload.get("quantity", "0")))),
+        fee=_to_decimal(payload["commission"]) if payload.get("commission") else None,
+        fee_asset=payload.get("commissionAsset"),
+        timestamp=_to_timestamp_from_ms(payload.get("time", 0)),
+    )
+
+
+def _parse_levels(raw: Any) -> list[DepthLevel]:
+    levels: list[DepthLevel] = []
+    if not isinstance(raw, list):
+        return levels
+    for item in raw:
+        if not isinstance(item, (list, tuple)) or len(item) < 2:
+            continue
+        try:
+            price = _to_decimal(item[0])
+            quantity = _to_decimal(item[1])
+            level = DepthLevel(price=price, quantity=quantity)
+        except (InvalidOperation, TypeError, ValueError):
+            continue
+        levels.append(level)
+    return levels
+
+
+def order_book_from_api(payload: dict[str, Any]) -> OrderBook:
+    """Map depth payload to an OrderBook VO."""
+
+    bids = _parse_levels(payload.get("bids", []))
+    asks = _parse_levels(payload.get("asks", []))
+    return OrderBook(bids=bids, asks=asks)
+</file>
+
 <file path="src/app/infrastructure/exchange/mexc/rest_client.py">
 import hashlib
 import hmac
@@ -5680,136 +5286,6 @@ class MexcRestClient:
     async def depth(self, *, symbol: str, limit: int = 50) -> dict[str, Any]:
         params: dict[str, Any] = {"symbol": symbol, "limit": limit}
         return await self._request("GET", "/api/v3/depth", params=params)
-</file>
-
-<file path="src/app/interfaces/http/api/qrl_routes.py">
-import asyncio
-from decimal import Decimal
-
-from fastapi import APIRouter, HTTPException, Query
-
-from src.app.application.market.qrl.get_qrl_depth import GetQrlDepth
-from src.app.application.market.qrl.get_qrl_kline import GetQrlKline
-from src.app.application.market.qrl.get_qrl_price import GetQrlPrice
-from src.app.application.market.use_cases.get_market_trades import GetMarketTradesUseCase
-from src.app.application.trading.qrl.cancel_qrl_order import CancelQrlOrder
-from src.app.application.trading.qrl.get_qrl_order import GetQrlOrder
-from src.app.application.trading.qrl.place_qrl_order import PlaceQrlOrder
-from src.app.application.account.use_cases.get_balance import GetBalanceUseCase
-from src.app.application.trading.use_cases.list_orders import ListOrdersUseCase
-from src.app.application.trading.use_cases.list_trades import ListTradesUseCase
-from src.app.domain.value_objects.qrl_price import QrlPrice
-from src.app.domain.value_objects.qrl_quantity import QrlQuantity
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
-from src.app.interfaces.http.schemas import PlaceOrderRequest
-
-router = APIRouter()
-
-
-def _client() -> QrlRestClient:
-    return QrlRestClient(QrlSettings())
-
-
-@router.get("/price")
-async def qrl_price():
-    usecase = GetQrlPrice(_client())
-    try:
-        snapshot = await usecase.execute()
-        return snapshot.to_dict()
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL price: {exc}") from exc
-
-
-@router.get("/kline")
-async def qrl_kline(interval: str = Query(default="1m"), limit: int = Query(default=50, ge=1, le=500)):
-    usecase = GetQrlKline(_client(), interval=interval, limit=limit)
-    try:
-        raw = await usecase.execute()
-        normalized = [
-            {"timestamp": item[0], "open": item[1], "high": item[2], "low": item[3], "close": item[4], "volume": item[5]}
-            for item in raw
-        ]
-        return normalized
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL klines: {exc}") from exc
-
-
-@router.get("/depth")
-async def qrl_depth(limit: int = Query(default=50, ge=5, le=1000)):
-    usecase = GetQrlDepth(_client(), limit=limit)
-    try:
-        return await usecase.execute()
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to fetch QRL depth: {exc}") from exc
-
-
-@router.post("/orders")
-async def qrl_place_order(request: PlaceOrderRequest):
-    usecase = PlaceQrlOrder(_client())
-    price_vo = QrlPrice(request.price) if request.price is not None else None
-    qty_vo = QrlQuantity(request.quantity)
-    return await usecase.execute(
-        side=request.side,
-        order_type=request.order_type,
-        price=price_vo,
-        quantity=qty_vo,
-        time_in_force=request.time_in_force,
-        client_order_id=request.client_order_id,
-    )
-
-
-@router.post("/orders/{order_id}/cancel")
-async def qrl_cancel_order(order_id: str):
-    usecase = CancelQrlOrder(_client())
-    return await usecase.execute(order_id=order_id, client_order_id=None)
-
-
-@router.get("/orders/{order_id}")
-async def qrl_get_order(order_id: str):
-    usecase = GetQrlOrder(_client())
-    return await usecase.execute(order_id=order_id, client_order_id=None)
-
-
-@router.get("/summary")
-async def qrl_summary(
-    interval: str = Query(default="1m"),
-    kline_limit: int = Query(default=50, ge=1, le=500),
-    depth_limit: int = Query(default=50, ge=5, le=1000),
-    trades_limit: int = Query(default=50, ge=1, le=500),
-):
-    """Aggregate price, kline, depth, and balance for dashboard consumption."""
-    price_uc = GetQrlPrice(_client())
-    kline_uc = GetQrlKline(_client(), interval=interval, limit=kline_limit)
-    depth_uc = GetQrlDepth(_client(), limit=depth_limit)
-    balance_uc = GetBalanceUseCase()
-    orders_uc = ListOrdersUseCase()
-    trades_uc = ListTradesUseCase()
-    market_trades_uc = GetMarketTradesUseCase()
-
-    price_result, kline_result, depth_result, balance_result, orders, trades, market_trades = await asyncio.gather(
-        price_uc.execute(),
-        kline_uc.execute(),
-        depth_uc.execute(),
-        balance_uc.execute(),
-        orders_uc.execute(symbol="QRLUSDT"),
-        trades_uc.execute("QRLUSDT"),
-        market_trades_uc.execute(),
-    )
-
-    normalized_klines = [
-        {"timestamp": item[0], "open": item[1], "high": item[2], "low": item[3], "close": item[4], "volume": item[5]}
-        for item in kline_result
-    ]
-    return {
-        "price": price_result.to_dict(),
-        "klines": normalized_klines,
-        "depth": depth_result,
-        "balance": balance_result,
-        "orders": orders,
-        "trades": trades,
-        "market_trades": market_trades[:trades_limit],
-    }
 </file>
 
 <file path="src/app/interfaces/http/pages/static/js/pages/dashboard-renderers.js">
@@ -6024,133 +5500,6 @@ async def run_allocation(timeout_seconds: float | None = None) -> AllocationResu
     usecase = AllocationUseCase()
     timeout = timeout_seconds or _allocation_timeout_seconds()
     return await asyncio.wait_for(usecase.execute(), timeout=timeout)
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/mappers.py">
-"""Mapping helpers between MEXC API payloads and domain objects."""
-
-from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation
-from typing import Any
-
-from src.app.domain.entities.account import Account
-from src.app.domain.entities.order import Order
-from src.app.domain.entities.trade import Trade
-from src.app.domain.value_objects.balance import Balance
-from src.app.domain.value_objects.order_book import DepthLevel, OrderBook
-from src.app.domain.value_objects.order_id import OrderId
-from src.app.domain.value_objects.order_status import OrderStatus
-from src.app.domain.value_objects.order_type import OrderType
-from src.app.domain.value_objects.quantity import Quantity
-from src.app.domain.value_objects.side import Side
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.time_in_force import TimeInForce
-from src.app.domain.value_objects.timestamp import Timestamp
-from src.app.domain.value_objects.trade_id import TradeId
-from src.app.domain.value_objects.qrl_price import QrlPrice
-
-
-def _to_decimal(value: Any) -> Decimal:
-    return Decimal(str(value))
-
-
-def _to_timestamp_from_ms(value: int | float | str) -> Timestamp:
-    if value in (None, "", 0):
-        ms_value = 0
-    else:
-        try:
-            ms_value = int(value)
-        except (TypeError, ValueError):
-            ms_value = 0
-    dt = datetime.fromtimestamp(ms_value / 1000, tz=timezone.utc)
-    return Timestamp(dt)
-
-
-def server_time_to_timestamp(payload: dict[str, Any]) -> Timestamp:
-    return _to_timestamp_from_ms(payload.get("serverTime", 0))
-
-
-def account_from_api(payload: dict[str, Any]) -> Account:
-    balances = [
-        Balance(asset=item["asset"], free=_to_decimal(item["free"]), locked=_to_decimal(item["locked"]))
-        for item in payload.get("balances", [])
-    ]
-    return Account(
-        can_trade=bool(payload.get("canTrade", True)),
-        update_time=_to_timestamp_from_ms(payload.get("updateTime", 0)),
-        balances=balances,
-    )
-
-
-def order_from_api(payload: dict[str, Any]) -> Order:
-    order_id_value = payload.get("orderId")
-    if order_id_value is None:
-        raise ValueError("orderId is required in MEXC response")
-    price_raw = payload.get("price", payload.get("origPrice"))
-    price_vo: QrlPrice | None = None
-    if price_raw not in (None, "", 0, "0"):
-        try:
-            price_vo = QrlPrice(_to_decimal(price_raw))
-        except (InvalidOperation, ValueError):
-            price_vo = None
-    return Order(
-        order_id=OrderId(str(order_id_value)),
-        symbol=Symbol(payload.get("symbol", "QRLUSDT")),
-        side=Side(payload.get("side", "BUY")),
-        order_type=OrderType(payload.get("type", "LIMIT")),
-        status=OrderStatus(payload.get("status", "NEW")),
-        price=price_vo,
-        quantity=Quantity(_to_decimal(payload.get("origQty", payload.get("quantity", "0.00000001")))),
-        time_in_force=TimeInForce(payload["timeInForce"]) if payload.get("timeInForce") else None,
-        created_at=_to_timestamp_from_ms(payload.get("transactTime", payload.get("createTime", 0))),
-        client_order_id=payload.get("clientOrderId") or payload.get("origClientOrderId"),
-        executed_quantity=_to_decimal(payload.get("executedQty", "0"))
-        if payload.get("executedQty") is not None
-        else None,
-        cumulative_quote_quantity=_to_decimal(payload.get("cummulativeQuoteQty", "0"))
-        if payload.get("cummulativeQuoteQty") is not None
-        else None,
-        updated_at=_to_timestamp_from_ms(payload["updateTime"]) if payload.get("updateTime") else None,
-    )
-
-
-def trade_from_api(payload: dict[str, Any]) -> Trade:
-    return Trade(
-        trade_id=TradeId(str(payload.get("id"))),
-        order_id=OrderId(str(payload.get("orderId"))),
-        symbol=Symbol(payload.get("symbol", "QRLUSDT")),
-        side=Side("BUY" if payload.get("isBuyer") else "SELL"),
-        price=QrlPrice(_to_decimal(payload.get("price", "0"))),
-        quantity=Quantity(_to_decimal(payload.get("qty", payload.get("quantity", "0")))),
-        fee=_to_decimal(payload["commission"]) if payload.get("commission") else None,
-        fee_asset=payload.get("commissionAsset"),
-        timestamp=_to_timestamp_from_ms(payload.get("time", 0)),
-    )
-
-
-def _parse_levels(raw: Any) -> list[DepthLevel]:
-    levels: list[DepthLevel] = []
-    if not isinstance(raw, list):
-        return levels
-    for item in raw:
-        if not isinstance(item, (list, tuple)) or len(item) < 2:
-            continue
-        try:
-            price = _to_decimal(item[0])
-            quantity = _to_decimal(item[1])
-            level = DepthLevel(price=price, quantity=quantity)
-        except (InvalidOperation, TypeError, ValueError):
-            continue
-        levels.append(level)
-    return levels
-
-
-def order_book_from_api(payload: dict[str, Any]) -> OrderBook:
-    """Map depth payload to an OrderBook VO."""
-
-    bids = _parse_levels(payload.get("bids", []))
-    asks = _parse_levels(payload.get("asks", []))
-    return OrderBook(bids=bids, asks=asks)
 </file>
 
 <file path="src/app/interfaces/http/pages/static/js/pages/dashboard.js">
@@ -6686,304 +6035,6 @@ def _result_from_success(
         slippage_pct=slippage.slippage_pct,
         expected_fill=slippage.expected_fill,
     )
-</file>
-
-<file path="src/app/interfaces/http/pages/static/css/dashboard.css">
-body {
-  font-family: Arial, sans-serif;
-  margin: 24px;
-}
-
-.skip-link {
-  position: absolute;
-  left: -999px;
-  top: auto;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-}
-
-.skip-link:focus {
-  left: 12px;
-  top: 12px;
-  width: auto;
-  height: auto;
-  padding: 8px 12px;
-  background: #fff;
-  border: 2px solid #2196f3;
-  border-radius: 6px;
-  z-index: 1000;
-}
-
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 360px 1fr 360px;
-  grid-template-areas:
-    "price kline orderform"
-    "depth kline orderform"
-    "trades kline balances"
-    "trades kline orders";
-  gap: 12px;
-  align-items: start;
-}
-
-@media (max-width: 1100px) {
-  .dashboard-grid {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    grid-template-areas:
-      "price"
-      "kline"
-      "orderform"
-      "depth"
-      "trades"
-      "balances"
-      "orders";
-  }
-}
-
-.card {
-  border: 1px solid #e0e0e0;
-  padding: 12px;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  background: #fff;
-}
-
-.price-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.label {
-  color: #666;
-}
-
-.value {
-  font-weight: bold;
-}
-
-canvas {
-  max-width: 100%;
-}
-
-.depth-list,
-.trades-list,
-.orders-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  max-height: 200px;
-  overflow-y: auto;
-  border: 1px solid #eee;
-  border-radius: 6px;
-}
-
-.depth-list li,
-.trades-list li,
-.orders-list li {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  padding: 6px 8px;
-  border-bottom: 1px solid #f2f2f2;
-  font-size: 0.92rem;
-}
-
-.depth-list li:last-child,
-.trades-list li:last-child,
-.orders-list li:last-child {
-  border-bottom: none;
-}
-
-.depth-list .price,
-.trades-list .price,
-.orders-list .price {
-  font-weight: 600;
-}
-
-.trades-list .side.buy,
-.orders-list .side.buy {
-  color: #2e7d32;
-  font-weight: 700;
-}
-
-.trades-list .side.sell,
-.orders-list .side.sell {
-  color: #c62828;
-  font-weight: 700;
-}
-
-.depth-col {
-  flex: 1;
-}
-
-.flex-row {
-  display: flex;
-  gap: 12px;
-}
-
-.vertical-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.price-card {
-  grid-area: price;
-  max-width: 360px;
-  width: 100%;
-  justify-self: start;
-}
-
-.kline-card {
-  grid-area: kline;
-}
-
-.depth-card {
-  grid-area: depth;
-  max-width: 360px;
-}
-
-.depth-card .depth-list {
-  max-height: 320px;
-}
-
-.depth-list li {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.trades-card {
-  grid-area: trades;
-  max-width: 360px;
-  width: 100%;
-  justify-self: start;
-}
-
-.trades-card .trades-list {
-  max-height: 150px;
-}
-
-.trades-list li {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.orders-card {
-  grid-area: orders;
-  max-width: 360px;
-  width: 100%;
-  justify-self: start;
-}
-
-.orders-card .orders-list {
-  max-height: 240px;
-}
-
-.balance-card {
-  grid-area: balances;
-  max-width: 360px;
-  width: 100%;
-  justify-self: start;
-}
-
-.order-card {
-  grid-area: orderform;
-  max-width: 340px;
-}
-
-.depth-list li {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  padding: 4px 6px;
-  font-size: 0.9rem;
-}
-
-.trades-list li {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  padding: 4px 6px;
-  font-size: 0.9rem;
-}
-
-.orders-list li {
-  /* Columns: ID | Side | Price | Quantity | Amount | Status | Action */
-  grid-template-columns: 1.6fr 0.8fr 1fr 1fr 1fr 1fr 0.9fr;
-  padding: 4px 6px;
-  font-size: 0.9rem;
-}
-
-.orders-list .orders-header {
-  position: sticky;
-  top: 0;
-  background: #fafafa;
-  font-weight: 700;
-  z-index: 1;
-}
-
-.orders-list .status-label {
-  color: #555;
-}
-
-.orders-list .order-cancel {
-  padding: 6px 10px;
-  background: #2196f3;
-  color: #fff;
-  border: 1px solid #2196f3;
-  border-radius: 4px;
-}
-
-.depth-list,
-.trades-list,
-.orders-list {
-  max-height: 240px;
-}
-
-form .form-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-form label {
-  width: 120px;
-  color: #444;
-}
-
-form input,
-form select {
-  flex: 1;
-  padding: 6px 8px;
-}
-
-button {
-  padding: 8px 14px;
-  background: #2196f3;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.side-toggle {
-  display: inline-flex;
-  gap: 8px;
-}
-
-.side-btn {
-  background: #e0e0e0;
-  color: #333;
-  border: 1px solid #d0d0d0;
-}
-
-.side-btn.active {
-  background: #2196f3;
-  color: #fff;
-  border-color: #2196f3;
-}
-
-.order-result {
-  margin-top: 8px;
-  color: #333;
-  font-size: 0.95rem;
-}
 </file>
 
 <file path="src/app/interfaces/http/pages/templates/dashboard/index.html">
