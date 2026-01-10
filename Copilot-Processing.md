@@ -1,1 +1,2 @@
-User request: repo-context.xml is project code; review sequentially using server-sequential-thinking & Software-planning-mcp to make project 100% comply with AGENTS.md. Repo path: /home/runner/work/qrl-url/qrl-url.
+User request: Ensure project complies 100% with AGENTS.md using repo-context.xml with server-sequential-thinking & Software-planning-mcp after reviewing code batches.
+Repo: ac484/qrl-url at /home/runner/work/qrl-url/qrl-url
