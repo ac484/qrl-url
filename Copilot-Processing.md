@@ -1,1 +1,1 @@
-User request: Simplify logic with minimal surgical changes in /home/runner/work/qrl-url/qrl-url without altering behavior; focus on small refactors removing redundancy.
+User request: Analyze PR #33 context and refactor /tasks/allocation using MCP server-sequential-thinking and Software-planning-mcp; deliver robust, atomic allocation logic for Cloud Run + Scheduler with DDD boundaries, cleanup, and verification.
