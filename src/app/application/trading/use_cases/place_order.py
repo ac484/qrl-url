@@ -3,7 +3,10 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-from src.app.application.exchange.mexc_service import MexcService, PlaceOrderRequest, build_mexc_service
+from src.app.application.ports.exchange_service import (
+    ExchangeServiceFactory,
+    PlaceOrderRequest,
+)
 from src.app.application.trading.dtos import OrderDTO
 from src.app.domain.entities.order import Order
 from src.app.domain.value_objects.order_type import OrderType
@@ -12,7 +15,6 @@ from src.app.domain.value_objects.quantity import Quantity
 from src.app.domain.value_objects.side import Side
 from src.app.domain.value_objects.symbol import Symbol
 from src.app.domain.value_objects.time_in_force import TimeInForce
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
 
 def _serialize_order(order: Order) -> dict:
@@ -36,7 +38,7 @@ def _serialize_order(order: Order) -> dict:
     return dto.to_dict()
 
 
-@dataclass
+@dataclass(frozen=True)
 class PlaceOrderInput:
     symbol: str
     side: str
@@ -48,10 +50,8 @@ class PlaceOrderInput:
 
 
 class PlaceOrderUseCase:
-    settings: MexcSettings | None = None
-
-    def __init__(self, settings: MexcSettings | None = None):
-        self.settings = settings
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
 
     async def execute(self, data: PlaceOrderInput) -> dict:
         request = PlaceOrderRequest(
@@ -63,7 +63,6 @@ class PlaceOrderUseCase:
             time_in_force=TimeInForce(data.time_in_force) if data.time_in_force else None,
             client_order_id=data.client_order_id,
         )
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            order = await svc.place_order(request)
+        async with self._exchange_factory() as exchange:
+            order = await exchange.place_order(request)
         return _serialize_order(order)

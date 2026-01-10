@@ -1,12 +1,12 @@
 import asyncio
-from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.app.application.market.qrl.get_qrl_depth import GetQrlDepth
 from src.app.application.market.qrl.get_qrl_kline import GetQrlKline
 from src.app.application.market.qrl.get_qrl_price import GetQrlPrice
 from src.app.application.market.use_cases.get_market_trades import GetMarketTradesUseCase
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
 from src.app.application.trading.qrl.cancel_qrl_order import CancelQrlOrder
 from src.app.application.trading.qrl.get_qrl_order import GetQrlOrder
 from src.app.application.trading.qrl.place_qrl_order import PlaceQrlOrder
@@ -15,20 +15,15 @@ from src.app.application.trading.use_cases.list_orders import ListOrdersUseCase
 from src.app.application.trading.use_cases.list_trades import ListTradesUseCase
 from src.app.domain.value_objects.qrl_price import QrlPrice
 from src.app.domain.value_objects.qrl_quantity import QrlQuantity
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
+from src.app.interfaces.http.dependencies import get_exchange_factory
 from src.app.interfaces.http.schemas import PlaceOrderRequest
 
 router = APIRouter()
 
 
-def _client() -> QrlRestClient:
-    return QrlRestClient(QrlSettings())
-
-
 @router.get("/price")
-async def qrl_price():
-    usecase = GetQrlPrice(_client())
+async def qrl_price(exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)):
+    usecase = GetQrlPrice(exchange_factory)
     try:
         snapshot = await usecase.execute()
         return snapshot.to_dict()
@@ -37,8 +32,12 @@ async def qrl_price():
 
 
 @router.get("/kline")
-async def qrl_kline(interval: str = Query(default="1m"), limit: int = Query(default=50, ge=1, le=500)):
-    usecase = GetQrlKline(_client(), interval=interval, limit=limit)
+async def qrl_kline(
+    interval: str = Query(default="1m"),
+    limit: int = Query(default=50, ge=1, le=500),
+    exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory),
+):
+    usecase = GetQrlKline(exchange_factory, interval=interval, limit=limit)
     try:
         raw = await usecase.execute()
         normalized = [
@@ -51,8 +50,11 @@ async def qrl_kline(interval: str = Query(default="1m"), limit: int = Query(defa
 
 
 @router.get("/depth")
-async def qrl_depth(limit: int = Query(default=50, ge=5, le=1000)):
-    usecase = GetQrlDepth(_client(), limit=limit)
+async def qrl_depth(
+    limit: int = Query(default=50, ge=5, le=1000),
+    exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory),
+):
+    usecase = GetQrlDepth(exchange_factory, limit=limit)
     try:
         return await usecase.execute()
     except Exception as exc:
@@ -60,8 +62,10 @@ async def qrl_depth(limit: int = Query(default=50, ge=5, le=1000)):
 
 
 @router.post("/orders")
-async def qrl_place_order(request: PlaceOrderRequest):
-    usecase = PlaceQrlOrder(_client())
+async def qrl_place_order(
+    request: PlaceOrderRequest, exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)
+):
+    usecase = PlaceQrlOrder(exchange_factory)
     price_vo = QrlPrice(request.price) if request.price is not None else None
     qty_vo = QrlQuantity(request.quantity)
     return await usecase.execute(
@@ -75,14 +79,16 @@ async def qrl_place_order(request: PlaceOrderRequest):
 
 
 @router.post("/orders/{order_id}/cancel")
-async def qrl_cancel_order(order_id: str):
-    usecase = CancelQrlOrder(_client())
+async def qrl_cancel_order(
+    order_id: str, exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)
+):
+    usecase = CancelQrlOrder(exchange_factory)
     return await usecase.execute(order_id=order_id, client_order_id=None)
 
 
 @router.get("/orders/{order_id}")
-async def qrl_get_order(order_id: str):
-    usecase = GetQrlOrder(_client())
+async def qrl_get_order(order_id: str, exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)):
+    usecase = GetQrlOrder(exchange_factory)
     return await usecase.execute(order_id=order_id, client_order_id=None)
 
 
@@ -92,15 +98,16 @@ async def qrl_summary(
     kline_limit: int = Query(default=50, ge=1, le=500),
     depth_limit: int = Query(default=50, ge=5, le=1000),
     trades_limit: int = Query(default=50, ge=1, le=500),
+    exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory),
 ):
     """Aggregate price, kline, depth, and balance for dashboard consumption."""
-    price_uc = GetQrlPrice(_client())
-    kline_uc = GetQrlKline(_client(), interval=interval, limit=kline_limit)
-    depth_uc = GetQrlDepth(_client(), limit=depth_limit)
-    balance_uc = GetBalanceUseCase()
-    orders_uc = ListOrdersUseCase()
-    trades_uc = ListTradesUseCase()
-    market_trades_uc = GetMarketTradesUseCase()
+    price_uc = GetQrlPrice(exchange_factory)
+    kline_uc = GetQrlKline(exchange_factory, interval=interval, limit=kline_limit)
+    depth_uc = GetQrlDepth(exchange_factory, limit=depth_limit)
+    balance_uc = GetBalanceUseCase(exchange_factory)
+    orders_uc = ListOrdersUseCase(exchange_factory)
+    trades_uc = ListTradesUseCase(exchange_factory)
+    market_trades_uc = GetMarketTradesUseCase(exchange_factory)
 
     price_result, kline_result, depth_result, balance_result, orders, trades, market_trades = await asyncio.gather(
         price_uc.execute(),

@@ -4,6 +4,7 @@ import asyncio
 import os
 
 from src.app.application.system.use_cases.allocation import AllocationResult, AllocationUseCase
+from src.app.interfaces.http.dependencies import build_exchange_factory
 
 
 def _allocation_timeout_seconds() -> float:
@@ -17,6 +18,7 @@ def _allocation_timeout_seconds() -> float:
 
 async def run_allocation(timeout_seconds: float | None = None) -> AllocationResult:
     """Trigger the allocation use case for Cloud Scheduler with a bounded runtime."""
-    usecase = AllocationUseCase()
+    exchange_factory = build_exchange_factory()
+    usecase = AllocationUseCase(exchange_factory)
     timeout = timeout_seconds or _allocation_timeout_seconds()
     return await asyncio.wait_for(usecase.execute(), timeout=timeout)

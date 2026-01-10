@@ -4,8 +4,9 @@ Market use case: get kline data for QRL/USDT.
 
 from dataclasses import dataclass
 
-from src.app.infrastructure.exchange.mexc.qrl.qrl_rest_client import QrlRestClient
-from src.app.infrastructure.exchange.mexc.qrl.qrl_settings import QrlSettings
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.domain.value_objects.kline import KLine
+from src.app.domain.value_objects.symbol import Symbol
 
 
 @dataclass
@@ -17,11 +18,25 @@ class GetKlineInput:
 class GetKlineUseCase:
     """Fetch klines for the fixed QRL/USDT symbol."""
 
-    def __init__(self, settings: QrlSettings | None = None):
-        self._settings = settings or QrlSettings()
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
 
     async def execute(self, data: GetKlineInput | None = None) -> list:
         payload = data or GetKlineInput()
-        client = QrlRestClient(self._settings)
-        async with client as cli:
-            return await cli.klines(interval=payload.interval, limit=payload.limit)
+        async with self._exchange_factory() as exchange:
+            klines = await exchange.get_kline(
+                Symbol("QRLUSDT"), interval=payload.interval, limit=payload.limit
+            )
+        return [_serialize_kline(kline) for kline in klines]
+
+
+def _serialize_kline(kline: KLine) -> dict:
+    return {
+        "open": str(kline.open),
+        "high": str(kline.high),
+        "low": str(kline.low),
+        "close": str(kline.close),
+        "volume": str(kline.volume),
+        "interval": kline.interval,
+        "timestamp": kline.timestamp.value.isoformat(),
+    }
