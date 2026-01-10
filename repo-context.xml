@@ -112,6 +112,7 @@ src/app/domain/events/market_depth_event.py
 src/app/domain/events/order_event.py
 src/app/domain/events/price_updated_event.py
 src/app/domain/events/trade_event.py
+src/app/domain/factories/aggregates.py
 src/app/domain/services/__init__.py
 src/app/domain/services/balance_comparison_rule.py
 src/app/domain/services/depth_calculator.py
@@ -880,112 +881,6 @@ class ListOrdersUseCase:
         return [_serialize_order(order) for order in orders]
 </file>
 
-<file path="src/app/application/trading/use_cases/list_trades.py">
-"""Trading use case: list trades for QRL/USDT."""
-
-from src.app.application.exchange.mexc_service import MexcService, build_mexc_service
-from src.app.domain.entities.trade import Trade
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
-
-
-def _serialize_trade(trade: Trade) -> dict:
-    return {
-        "trade_id": trade.trade_id.value,
-        "order_id": trade.order_id.value,
-        "symbol": trade.symbol.value,
-        "side": trade.side.value,
-        "price": str(trade.price),
-        "quantity": str(trade.quantity),
-        "fee": str(trade.fee) if trade.fee is not None else None,
-        "fee_asset": trade.fee_asset,
-        "timestamp": trade.timestamp.value.isoformat(),
-    }
-
-
-class ListTradesUseCase:
-    settings: MexcSettings | None = None
-
-    def __init__(self, settings: MexcSettings | None = None):
-        self.settings = settings
-
-    async def execute(self, symbol: str) -> list[dict]:
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            trades = await svc.list_trades(Symbol(symbol))
-        return [_serialize_trade(trade) for trade in trades]
-</file>
-
-<file path="src/app/application/trading/use_cases/place_order.py">
-"""Trading use case: place order for QRL/USDT."""
-
-from dataclasses import dataclass
-from decimal import Decimal
-
-from src.app.application.exchange.mexc_service import MexcService, PlaceOrderRequest, build_mexc_service
-from src.app.domain.entities.order import Order
-from src.app.domain.value_objects.order_type import OrderType
-from src.app.domain.value_objects.price import Price
-from src.app.domain.value_objects.quantity import Quantity
-from src.app.domain.value_objects.side import Side
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.time_in_force import TimeInForce
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
-
-
-def _serialize_order(order: Order) -> dict:
-    return {
-        "order_id": order.order_id.value,
-        "symbol": order.symbol.value,
-        "side": order.side.value,
-        "type": order.order_type.value,
-        "status": order.status.value,
-        "price": str(order.price),
-        "quantity": str(order.quantity.value),
-        "executed_quantity": str(order.executed_quantity) if order.executed_quantity else None,
-        "cumulative_quote_quantity": str(order.cumulative_quote_quantity)
-        if order.cumulative_quote_quantity
-        else None,
-        "time_in_force": order.time_in_force.value if order.time_in_force else None,
-        "client_order_id": order.client_order_id,
-        "created_at": order.created_at.value.isoformat(),
-        "updated_at": order.updated_at.value.isoformat() if order.updated_at else None,
-    }
-
-
-@dataclass
-class PlaceOrderInput:
-    symbol: str
-    side: str
-    quantity: Decimal
-    price: Decimal | None
-    order_type: str = "LIMIT"
-    time_in_force: str = "GTC"
-    client_order_id: str | None = None
-
-
-class PlaceOrderUseCase:
-    settings: MexcSettings | None = None
-
-    def __init__(self, settings: MexcSettings | None = None):
-        self.settings = settings
-
-    async def execute(self, data: PlaceOrderInput) -> dict:
-        request = PlaceOrderRequest(
-            symbol=Symbol(data.symbol),
-            side=Side(data.side),
-            order_type=OrderType(data.order_type),
-            quantity=Quantity(data.quantity),
-            price=Price.from_single(data.price) if data.price is not None else None,
-            time_in_force=TimeInForce(data.time_in_force) if data.time_in_force else None,
-            client_order_id=data.client_order_id,
-        )
-        service = build_mexc_service(self.settings or MexcSettings())
-        async with service as svc:
-            order = await svc.place_order(request)
-        return _serialize_order(order)
-</file>
-
 <file path="src/app/domain/__init__.py">
 """Domain layer root."""
 </file>
@@ -1003,66 +898,6 @@ class Account:
     can_trade: bool
     update_time: Timestamp
     balances: list[Balance]
-</file>
-
-<file path="src/app/domain/entities/order.py">
-from dataclasses import dataclass
-from datetime import datetime
-from decimal import Decimal
-
-from src.app.domain.value_objects.order_id import OrderId
-from src.app.domain.value_objects.order_status import OrderStatus
-from src.app.domain.value_objects.order_type import OrderType
-from src.app.domain.value_objects.quantity import Quantity
-from src.app.domain.value_objects.side import Side
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.time_in_force import TimeInForce
-from src.app.domain.value_objects.timestamp import Timestamp
-
-
-@dataclass
-class Order:
-    """Order entity limited to QRL/USDT spot."""
-
-    order_id: OrderId
-    symbol: Symbol
-    side: Side
-    order_type: OrderType
-    status: OrderStatus
-    price: Decimal
-    quantity: Quantity
-    created_at: Timestamp
-    time_in_force: TimeInForce | None = None
-    client_order_id: str | None = None
-    executed_quantity: Decimal | None = None
-    cumulative_quote_quantity: Decimal | None = None
-    updated_at: Timestamp | None = None
-</file>
-
-<file path="src/app/domain/entities/trade.py">
-from dataclasses import dataclass
-from decimal import Decimal
-
-from src.app.domain.value_objects.order_id import OrderId
-from src.app.domain.value_objects.side import Side
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.timestamp import Timestamp
-from src.app.domain.value_objects.trade_id import TradeId
-
-
-@dataclass
-class Trade:
-    """Trade fill record."""
-
-    trade_id: TradeId
-    order_id: OrderId
-    symbol: Symbol
-    side: Side
-    price: Decimal
-    quantity: Decimal
-    fee: Decimal | None
-    fee_asset: str | None
-    timestamp: Timestamp
 </file>
 
 <file path="src/app/domain/entities/trading_pair.py">
@@ -3546,6 +3381,25 @@ def register_all_routers(app: FastAPI) -> None:
 """API routers for JSON endpoints."""
 </file>
 
+<file path="src/app/interfaces/http/api/account_routes.py">
+from fastapi import APIRouter, HTTPException
+
+from src.app.application.account.use_cases.get_balance import GetBalanceUseCase
+
+router = APIRouter()
+
+
+@router.get("/balance")
+async def get_balance():
+    """Get subaccount balance for QRL/USDT."""
+    usecase = GetBalanceUseCase()
+    try:
+        return await usecase.execute()
+    except Exception as exc:
+        # Surface a clear error to the dashboard instead of a generic 500
+        raise HTTPException(status_code=502, detail=f"Failed to fetch balance: {exc}") from exc
+</file>
+
 <file path="src/app/interfaces/http/api/system_routes.py">
 from fastapi import APIRouter
 
@@ -4194,6 +4048,112 @@ class GetTickerUseCase:
             return await cli.ticker_24h()
 </file>
 
+<file path="src/app/application/trading/use_cases/list_trades.py">
+"""Trading use case: list trades for QRL/USDT."""
+
+from src.app.application.exchange.mexc_service import MexcService, build_mexc_service
+from src.app.domain.entities.trade import Trade
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.infrastructure.exchange.mexc.settings import MexcSettings
+
+
+def _serialize_trade(trade: Trade) -> dict:
+    return {
+        "trade_id": trade.trade_id.value,
+        "order_id": trade.order_id.value,
+        "symbol": trade.symbol.value,
+        "side": trade.side.value,
+        "price": str(trade.price.value),
+        "quantity": str(trade.quantity.value),
+        "fee": str(trade.fee) if trade.fee is not None else None,
+        "fee_asset": trade.fee_asset,
+        "timestamp": trade.timestamp.value.isoformat(),
+    }
+
+
+class ListTradesUseCase:
+    settings: MexcSettings | None = None
+
+    def __init__(self, settings: MexcSettings | None = None):
+        self.settings = settings
+
+    async def execute(self, symbol: str) -> list[dict]:
+        service = build_mexc_service(self.settings or MexcSettings())
+        async with service as svc:
+            trades = await svc.list_trades(Symbol(symbol))
+        return [_serialize_trade(trade) for trade in trades]
+</file>
+
+<file path="src/app/application/trading/use_cases/place_order.py">
+"""Trading use case: place order for QRL/USDT."""
+
+from dataclasses import dataclass
+from decimal import Decimal
+
+from src.app.application.exchange.mexc_service import MexcService, PlaceOrderRequest, build_mexc_service
+from src.app.domain.entities.order import Order
+from src.app.domain.value_objects.order_type import OrderType
+from src.app.domain.value_objects.price import Price
+from src.app.domain.value_objects.quantity import Quantity
+from src.app.domain.value_objects.side import Side
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.time_in_force import TimeInForce
+from src.app.infrastructure.exchange.mexc.settings import MexcSettings
+
+
+def _serialize_order(order: Order) -> dict:
+    return {
+        "order_id": order.order_id.value,
+        "symbol": order.symbol.value,
+        "side": order.side.value,
+        "type": order.order_type.value,
+        "status": order.status.value,
+        "price": str(order.price.value) if order.price else None,
+        "quantity": str(order.quantity.value),
+        "executed_quantity": str(order.executed_quantity) if order.executed_quantity else None,
+        "cumulative_quote_quantity": str(order.cumulative_quote_quantity)
+        if order.cumulative_quote_quantity
+        else None,
+        "time_in_force": order.time_in_force.value if order.time_in_force else None,
+        "client_order_id": order.client_order_id,
+        "created_at": order.created_at.value.isoformat(),
+        "updated_at": order.updated_at.value.isoformat() if order.updated_at else None,
+    }
+
+
+@dataclass
+class PlaceOrderInput:
+    symbol: str
+    side: str
+    quantity: Decimal
+    price: Decimal | None
+    order_type: str = "LIMIT"
+    time_in_force: str = "GTC"
+    client_order_id: str | None = None
+
+
+class PlaceOrderUseCase:
+    settings: MexcSettings | None = None
+
+    def __init__(self, settings: MexcSettings | None = None):
+        self.settings = settings
+
+    async def execute(self, data: PlaceOrderInput) -> dict:
+        request = PlaceOrderRequest(
+            symbol=Symbol(data.symbol),
+            side=Side(data.side),
+            order_type=OrderType(data.order_type),
+            quantity=Quantity(data.quantity),
+            price=Price.from_single(data.price) if data.price is not None else None,
+            time_in_force=TimeInForce(data.time_in_force) if data.time_in_force else None,
+            client_order_id=data.client_order_id,
+        )
+        service = build_mexc_service(self.settings or MexcSettings())
+        async with service as svc:
+            order = await svc.place_order(request)
+        return _serialize_order(order)
+</file>
+
 <file path="src/app/domain/aggregates/__init__.py">
 """Domain aggregates for the QRL/USDT trading context."""
 
@@ -4315,6 +4275,133 @@ class OrderBookLevel:
     price: Decimal
     quantity: Decimal
     side: OrderSide
+</file>
+
+<file path="src/app/domain/entities/order.py">
+from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal
+
+from src.app.domain.value_objects.order_id import OrderId
+from src.app.domain.value_objects.order_status import OrderStatus
+from src.app.domain.value_objects.order_type import OrderType
+from src.app.domain.value_objects.quantity import Quantity
+from src.app.domain.value_objects.side import Side
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.time_in_force import TimeInForce
+from src.app.domain.value_objects.timestamp import Timestamp
+from src.app.domain.value_objects.qrl_price import QrlPrice
+
+
+@dataclass
+class Order:
+    """Order entity limited to QRL/USDT spot."""
+
+    order_id: OrderId
+    symbol: Symbol
+    side: Side
+    order_type: OrderType
+    status: OrderStatus
+    price: QrlPrice | None
+    quantity: Quantity
+    created_at: Timestamp
+    time_in_force: TimeInForce | None = None
+    client_order_id: str | None = None
+    executed_quantity: Decimal | None = None
+    cumulative_quote_quantity: Decimal | None = None
+    updated_at: Timestamp | None = None
+</file>
+
+<file path="src/app/domain/entities/trade.py">
+from dataclasses import dataclass
+from decimal import Decimal
+
+from src.app.domain.value_objects.order_id import OrderId
+from src.app.domain.value_objects.side import Side
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.timestamp import Timestamp
+from src.app.domain.value_objects.trade_id import TradeId
+from src.app.domain.value_objects.qrl_price import QrlPrice
+from src.app.domain.value_objects.quantity import Quantity
+
+
+@dataclass
+class Trade:
+    """Trade fill record."""
+
+    trade_id: TradeId
+    order_id: OrderId
+    symbol: Symbol
+    side: Side
+    price: QrlPrice
+    quantity: Quantity
+    fee: Decimal | None
+    fee_asset: str | None
+    timestamp: Timestamp
+</file>
+
+<file path="src/app/domain/factories/aggregates.py">
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Iterable
+
+from src.app.domain.aggregates.account_state import AccountState
+from src.app.domain.aggregates.market_snapshot import MarketSnapshot
+from src.app.domain.aggregates.trading_session import TradingSession
+from src.app.domain.entities.account import Account
+from src.app.domain.entities.order import Order
+from src.app.domain.entities.order_book_level import OrderBookLevel
+from src.app.domain.entities.trade import Trade
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.ticker import Ticker
+from src.app.domain.value_objects.timestamp import Timestamp
+
+
+def _ts_now() -> Timestamp:
+    return Timestamp(datetime.now(timezone.utc))
+
+
+def build_account_state(
+    *, symbol: Symbol, account: Account, open_orders: Iterable[Order] = ()
+) -> AccountState:
+    return AccountState(
+        symbol=symbol,
+        account=account,
+        open_orders=list(open_orders),
+        updated_at=_ts_now(),
+    )
+
+
+def build_trading_session(
+    *, symbol: Symbol, orders: Iterable[Order] = (), trades: Iterable[Trade] = ()
+) -> TradingSession:
+    now = _ts_now()
+    return TradingSession(
+        symbol=symbol,
+        open_orders=list(orders),
+        trades=list(trades),
+        started_at=now,
+        last_activity_at=now,
+    )
+
+
+def build_market_snapshot(
+    *,
+    symbol: Symbol,
+    bids: Iterable[OrderBookLevel] = (),
+    asks: Iterable[OrderBookLevel] = (),
+    trades: Iterable[Trade] = (),
+    ticker: Ticker | None = None,
+) -> MarketSnapshot:
+    return MarketSnapshot(
+        symbol=symbol,
+        bids=list(bids),
+        asks=list(asks),
+        trades=list(trades),
+        ticker=ticker,
+        updated_at=_ts_now(),
+    )
 </file>
 
 <file path="src/app/domain/services/__init__.py">
@@ -4474,25 +4561,6 @@ class SlippageAssessment:
     slippage_pct: Decimal
     is_acceptable: bool
     reason: str | None = None
-</file>
-
-<file path="src/app/interfaces/http/api/account_routes.py">
-from fastapi import APIRouter, HTTPException
-
-from src.app.application.account.use_cases.get_balance import GetBalanceUseCase
-
-router = APIRouter()
-
-
-@router.get("/balance")
-async def get_balance():
-    """Get subaccount balance for QRL/USDT."""
-    usecase = GetBalanceUseCase()
-    try:
-        return await usecase.execute()
-    except Exception as exc:
-        # Surface a clear error to the dashboard instead of a generic 500
-        raise HTTPException(status_code=502, detail=f"Failed to fetch balance: {exc}") from exc
 </file>
 
 <file path="src/app/interfaces/http/pages/dashboard_routes.py">
@@ -5042,6 +5110,183 @@ class OrderBook:
     asks: list[DepthLevel] = field(default_factory=list)
 </file>
 
+<file path="src/app/infrastructure/exchange/mexc/qrl/qrl_rest_client.py">
+from src.app.domain.value_objects.qrl_usdt_pair import QrlUsdtPair
+from src.app.infrastructure.exchange.mexc.rest_client import MexcRestClient
+from src.app.infrastructure.exchange.mexc.settings import MexcSettings
+
+
+class QrlRestClient:
+    """Wrapper to freeze symbol to QRL/USDT for all REST calls."""
+
+    def __init__(self, settings: MexcSettings):
+        self._settings = settings
+        self._client = MexcRestClient(settings)
+
+    async def __aenter__(self) -> "QrlRestClient":
+        await self._client.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        await self._client.__aexit__(exc_type, exc, tb)
+
+    async def ticker_24h(self) -> dict:
+        return await self._client.ticker_24h(symbol=QrlUsdtPair.symbol())
+
+    async def klines(self, *, interval: str, limit: int) -> list:
+        return await self._client.klines(symbol=QrlUsdtPair.symbol(), interval=interval, limit=limit)
+
+    async def depth(self, *, limit: int = 50) -> dict:
+        return await self._client.depth(symbol=QrlUsdtPair.symbol(), limit=limit)
+
+    async def market_trades(self, *, limit: int = 50) -> list:
+        return await self._client.trades(symbol=QrlUsdtPair.symbol(), limit=limit)
+
+    async def create_order(
+        self,
+        *,
+        side: str,
+        order_type: str,
+        quantity: str,
+        price: str | None,
+        time_in_force: str | None,
+        client_order_id: str | None,
+    ) -> dict:
+        return await self._client.create_order(
+            symbol=QrlUsdtPair.symbol(),
+            side=side,
+            order_type=order_type,
+            quantity=quantity,
+            price=price,
+            time_in_force=time_in_force,
+            client_order_id=client_order_id,
+        )
+
+    async def get_order(self, *, order_id: str | None, client_order_id: str | None) -> dict:
+        return await self._client.get_order(
+            symbol=QrlUsdtPair.symbol(), order_id=order_id, client_order_id=client_order_id
+        )
+
+    async def cancel_order(self, *, order_id: str | None, client_order_id: str | None) -> dict:
+        return await self._client.cancel_order(
+            symbol=QrlUsdtPair.symbol(), order_id=order_id, client_order_id=client_order_id
+        )
+</file>
+
+<file path="src/app/infrastructure/exchange/mexc/settings.py">
+from typing import Literal
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class MexcSettings(BaseSettings):
+    """Configuration for MEXC REST client."""
+
+    api_key: str = Field(alias="MEXC_API_KEY")
+    api_secret: str = Field(alias="MEXC_SECRET_KEY")
+    base_url: str = Field(default="https://api.mexc.com", alias="MEXC_BASE_URL")
+    recv_window: int = Field(default=5000, alias="MEXC_RECV_WINDOW")
+    timeout: int = Field(default=10, alias="MEXC_TIMEOUT")
+    max_connections: int = Field(default=20, alias="MEXC_MAX_CONNECTIONS", gt=0)
+    max_keepalive_connections: int = Field(default=10, alias="MEXC_MAX_KEEPALIVE", gt=0)
+    keepalive_expiry: float = Field(default=15.0, alias="MEXC_KEEPALIVE_EXPIRY", gt=0)
+    sub_account_mode: Literal["SPOT", "BROKER"] = Field(default="SPOT", alias="SUB_ACCOUNT_MODE")
+    sub_account_id: int | str | None = Field(default=None, alias="SUB_ACCOUNT_ID")
+    sub_account_name: str | None = Field(default=None, alias="SUB_ACCOUNT_NAME")
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @field_validator("sub_account_mode")
+    @classmethod
+    def _uppercase_mode(cls, value: str) -> str:
+        return value.upper()
+
+    @field_validator("sub_account_id", "sub_account_name")
+    @classmethod
+    def _empty_to_none(cls, value: str | int | None) -> str | int | None:
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
+
+    @field_validator("api_key", "api_secret")
+    @classmethod
+    def _strip_whitespace(cls, value: str) -> str:
+        cleaned = value.strip()
+        if "\n" in cleaned or "\r" in cleaned:
+            cleaned = cleaned.replace("\n", "").replace("\r", "")
+        return cleaned
+</file>
+
+<file path="src/app/interfaces/http/api/market_routes.py">
+from fastapi import APIRouter, Query
+
+from src.app.application.market.use_cases.get_depth import GetDepthUseCase
+from src.app.application.market.use_cases.get_kline import GetKlineUseCase
+from src.app.application.market.use_cases.get_market_trades import GetMarketTradesInput, GetMarketTradesUseCase
+from src.app.application.market.use_cases.get_stats24h import GetStats24hUseCase
+from src.app.application.market.use_cases.get_ticker import GetTickerUseCase
+
+router = APIRouter()
+
+
+@router.get("/depth")
+async def get_depth(limit: int = Query(default=50, ge=5, le=1000)):
+    """Get order book depth for QRL/USDT."""
+    usecase = GetDepthUseCase()
+    from src.app.application.market.use_cases.get_depth import GetDepthInput
+
+    return await usecase.execute(data=GetDepthInput(limit=limit))
+
+
+@router.get("/ticker")
+async def get_ticker():
+    """Get ticker for QRL/USDT."""
+    usecase = GetTickerUseCase()
+    return await usecase.execute()
+
+
+@router.get("/kline")
+async def get_kline(interval: str = Query(default="1m"), limit: int = Query(default=50, ge=1, le=500)):
+    """Get kline data for QRL/USDT."""
+    usecase = GetKlineUseCase()
+    from src.app.application.market.use_cases.get_kline import GetKlineInput
+
+    return await usecase.execute(data=GetKlineInput(interval=interval, limit=limit))
+
+
+@router.get("/stats24h")
+async def get_stats_24h():
+    """Get 24h statistics for QRL/USDT."""
+    usecase = GetStats24hUseCase()
+    return await usecase.execute()
+
+
+@router.get("/trades")
+async def get_market_trades(limit: int = Query(default=50, ge=1, le=500)):
+    """Get recent public trades for QRL/USDT."""
+    usecase = GetMarketTradesUseCase()
+    return await usecase.execute(data=GetMarketTradesInput(limit=limit))
+</file>
+
+<file path="src/app/interfaces/http/pages/static/js/domain/order.js">
+(() => {
+  const cancelOrder = async (cfg, orderId) => {
+    if (!orderId) throw new Error("orderId required");
+    const url = `${cfg.cancelOrderBase || "/api/trading/orders"}/${orderId}/cancel`;
+    const resp = await fetch(url, { method: "POST" });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const detail = data.detail || JSON.stringify(data);
+      throw new Error(detail);
+    }
+    return data;
+  };
+
+  window.orderDomain = { cancelOrder };
+})();
+</file>
+
 <file path="src/app/infrastructure/exchange/mexc/factories.py">
 """
 Factories to translate MEXC REST/WebSocket DTOs into domain aggregates.
@@ -5058,6 +5303,11 @@ from typing import Iterable, Optional
 from src.app.domain.aggregates.account_state import AccountState
 from src.app.domain.aggregates.market_snapshot import MarketSnapshot
 from src.app.domain.aggregates.trading_session import TradingSession
+from src.app.domain.factories.aggregates import (
+    build_account_state,
+    build_market_snapshot,
+    build_trading_session,
+)
 from src.app.domain.entities.account import Account
 from src.app.domain.entities.kline import Kline
 from src.app.domain.entities.order import Order
@@ -5141,13 +5391,12 @@ def market_snapshot_from_sources(
                 ts=_default_timestamp().value,
             )
 
-    return MarketSnapshot(
+    return build_market_snapshot(
         symbol=symbol,
         bids=bids,
         asks=asks,
         trades=list(trades or []),
         ticker=ticker,
-        updated_at=_default_timestamp(),
     )
 
 
@@ -5176,12 +5425,7 @@ def account_state_from_proto(
         update_time=_default_timestamp(),
         balances=balances,
     )
-    return AccountState(
-        symbol=symbol,
-        account=account,
-        open_orders=[],
-        updated_at=_default_timestamp(),
-    )
+    return build_account_state(symbol=symbol, account=account, open_orders=[])
 
 
 def trading_session_from_orders(
@@ -5189,13 +5433,7 @@ def trading_session_from_orders(
 ) -> TradingSession:
     """Create a TradingSession aggregate from existing order/trade records."""
 
-    return TradingSession(
-        symbol=symbol,
-        open_orders=list(orders or []),
-        trades=list(trades or []),
-        started_at=_default_timestamp(),
-        last_activity_at=_default_timestamp(),
-    )
+    return build_trading_session(symbol=symbol, orders=orders or [], trades=trades or [])
 
 
 def trades_from_public_proto(
@@ -5283,516 +5521,6 @@ def orders_from_private_proto(
             )
         )
     return orders
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/qrl/qrl_rest_client.py">
-from src.app.domain.value_objects.qrl_usdt_pair import QrlUsdtPair
-from src.app.infrastructure.exchange.mexc.rest_client import MexcRestClient
-from src.app.infrastructure.exchange.mexc.settings import MexcSettings
-
-
-class QrlRestClient:
-    """Wrapper to freeze symbol to QRL/USDT for all REST calls."""
-
-    def __init__(self, settings: MexcSettings):
-        self._settings = settings
-        self._client = MexcRestClient(settings)
-
-    async def __aenter__(self) -> "QrlRestClient":
-        await self._client.__aenter__()
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self._client.__aexit__(exc_type, exc, tb)
-
-    async def ticker_24h(self) -> dict:
-        return await self._client.ticker_24h(symbol=QrlUsdtPair.symbol())
-
-    async def klines(self, *, interval: str, limit: int) -> list:
-        return await self._client.klines(symbol=QrlUsdtPair.symbol(), interval=interval, limit=limit)
-
-    async def depth(self, *, limit: int = 50) -> dict:
-        return await self._client.depth(symbol=QrlUsdtPair.symbol(), limit=limit)
-
-    async def market_trades(self, *, limit: int = 50) -> list:
-        return await self._client.trades(symbol=QrlUsdtPair.symbol(), limit=limit)
-
-    async def create_order(
-        self,
-        *,
-        side: str,
-        order_type: str,
-        quantity: str,
-        price: str | None,
-        time_in_force: str | None,
-        client_order_id: str | None,
-    ) -> dict:
-        return await self._client.create_order(
-            symbol=QrlUsdtPair.symbol(),
-            side=side,
-            order_type=order_type,
-            quantity=quantity,
-            price=price,
-            time_in_force=time_in_force,
-            client_order_id=client_order_id,
-        )
-
-    async def get_order(self, *, order_id: str | None, client_order_id: str | None) -> dict:
-        return await self._client.get_order(
-            symbol=QrlUsdtPair.symbol(), order_id=order_id, client_order_id=client_order_id
-        )
-
-    async def cancel_order(self, *, order_id: str | None, client_order_id: str | None) -> dict:
-        return await self._client.cancel_order(
-            symbol=QrlUsdtPair.symbol(), order_id=order_id, client_order_id=client_order_id
-        )
-</file>
-
-<file path="src/app/interfaces/http/api/market_routes.py">
-from fastapi import APIRouter, Query
-
-from src.app.application.market.use_cases.get_depth import GetDepthUseCase
-from src.app.application.market.use_cases.get_kline import GetKlineUseCase
-from src.app.application.market.use_cases.get_market_trades import GetMarketTradesInput, GetMarketTradesUseCase
-from src.app.application.market.use_cases.get_stats24h import GetStats24hUseCase
-from src.app.application.market.use_cases.get_ticker import GetTickerUseCase
-
-router = APIRouter()
-
-
-@router.get("/depth")
-async def get_depth(limit: int = Query(default=50, ge=5, le=1000)):
-    """Get order book depth for QRL/USDT."""
-    usecase = GetDepthUseCase()
-    from src.app.application.market.use_cases.get_depth import GetDepthInput
-
-    return await usecase.execute(data=GetDepthInput(limit=limit))
-
-
-@router.get("/ticker")
-async def get_ticker():
-    """Get ticker for QRL/USDT."""
-    usecase = GetTickerUseCase()
-    return await usecase.execute()
-
-
-@router.get("/kline")
-async def get_kline(interval: str = Query(default="1m"), limit: int = Query(default=50, ge=1, le=500)):
-    """Get kline data for QRL/USDT."""
-    usecase = GetKlineUseCase()
-    from src.app.application.market.use_cases.get_kline import GetKlineInput
-
-    return await usecase.execute(data=GetKlineInput(interval=interval, limit=limit))
-
-
-@router.get("/stats24h")
-async def get_stats_24h():
-    """Get 24h statistics for QRL/USDT."""
-    usecase = GetStats24hUseCase()
-    return await usecase.execute()
-
-
-@router.get("/trades")
-async def get_market_trades(limit: int = Query(default=50, ge=1, le=500)):
-    """Get recent public trades for QRL/USDT."""
-    usecase = GetMarketTradesUseCase()
-    return await usecase.execute(data=GetMarketTradesInput(limit=limit))
-</file>
-
-<file path="src/app/interfaces/http/pages/static/js/domain/order.js">
-(() => {
-  const cancelOrder = async (cfg, orderId) => {
-    if (!orderId) throw new Error("orderId required");
-    const url = `${cfg.cancelOrderBase || "/api/trading/orders"}/${orderId}/cancel`;
-    const resp = await fetch(url, { method: "POST" });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      const detail = data.detail || JSON.stringify(data);
-      throw new Error(detail);
-    }
-    return data;
-  };
-
-  window.orderDomain = { cancelOrder };
-})();
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/mappers.py">
-"""Mapping helpers between MEXC API payloads and domain objects."""
-
-from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation
-from typing import Any
-
-from src.app.domain.entities.account import Account
-from src.app.domain.entities.order import Order
-from src.app.domain.entities.trade import Trade
-from src.app.domain.value_objects.balance import Balance
-from src.app.domain.value_objects.order_book import DepthLevel, OrderBook
-from src.app.domain.value_objects.order_id import OrderId
-from src.app.domain.value_objects.order_status import OrderStatus
-from src.app.domain.value_objects.order_type import OrderType
-from src.app.domain.value_objects.quantity import Quantity
-from src.app.domain.value_objects.side import Side
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.time_in_force import TimeInForce
-from src.app.domain.value_objects.timestamp import Timestamp
-from src.app.domain.value_objects.trade_id import TradeId
-
-
-def _to_decimal(value: Any) -> Decimal:
-    return Decimal(str(value))
-
-
-def _to_timestamp_from_ms(value: int | float | str) -> Timestamp:
-    if value in (None, "", 0):
-        ms_value = 0
-    else:
-        try:
-            ms_value = int(value)
-        except (TypeError, ValueError):
-            ms_value = 0
-    dt = datetime.fromtimestamp(ms_value / 1000, tz=timezone.utc)
-    return Timestamp(dt)
-
-
-def server_time_to_timestamp(payload: dict[str, Any]) -> Timestamp:
-    return _to_timestamp_from_ms(payload.get("serverTime", 0))
-
-
-def account_from_api(payload: dict[str, Any]) -> Account:
-    balances = [
-        Balance(asset=item["asset"], free=_to_decimal(item["free"]), locked=_to_decimal(item["locked"]))
-        for item in payload.get("balances", [])
-    ]
-    return Account(
-        can_trade=bool(payload.get("canTrade", True)),
-        update_time=_to_timestamp_from_ms(payload.get("updateTime", 0)),
-        balances=balances,
-    )
-
-
-def order_from_api(payload: dict[str, Any]) -> Order:
-    order_id_value = payload.get("orderId")
-    if order_id_value is None:
-        raise ValueError("orderId is required in MEXC response")
-    return Order(
-        order_id=OrderId(str(order_id_value)),
-        symbol=Symbol(payload.get("symbol", "QRLUSDT")),
-        side=Side(payload.get("side", "BUY")),
-        order_type=OrderType(payload.get("type", "LIMIT")),
-        status=OrderStatus(payload.get("status", "NEW")),
-        price=_to_decimal(payload.get("price", "0")),
-        quantity=Quantity(_to_decimal(payload.get("origQty", payload.get("quantity", "0.00000001")))),
-        time_in_force=TimeInForce(payload["timeInForce"]) if payload.get("timeInForce") else None,
-        created_at=_to_timestamp_from_ms(payload.get("transactTime", payload.get("createTime", 0))),
-        client_order_id=payload.get("clientOrderId") or payload.get("origClientOrderId"),
-        executed_quantity=_to_decimal(payload.get("executedQty", "0"))
-        if payload.get("executedQty") is not None
-        else None,
-        cumulative_quote_quantity=_to_decimal(payload.get("cummulativeQuoteQty", "0"))
-        if payload.get("cummulativeQuoteQty") is not None
-        else None,
-        updated_at=_to_timestamp_from_ms(payload["updateTime"]) if payload.get("updateTime") else None,
-    )
-
-
-def trade_from_api(payload: dict[str, Any]) -> Trade:
-    return Trade(
-        trade_id=TradeId(str(payload.get("id"))),
-        order_id=OrderId(str(payload.get("orderId"))),
-        symbol=Symbol(payload.get("symbol", "QRLUSDT")),
-        side=Side("BUY" if payload.get("isBuyer") else "SELL"),
-        price=_to_decimal(payload.get("price", "0")),
-        quantity=_to_decimal(payload.get("qty", payload.get("quantity", "0"))),
-        fee=_to_decimal(payload["commission"]) if payload.get("commission") else None,
-        fee_asset=payload.get("commissionAsset"),
-        timestamp=_to_timestamp_from_ms(payload.get("time", 0)),
-    )
-
-
-def _parse_levels(raw: Any) -> list[DepthLevel]:
-    levels: list[DepthLevel] = []
-    if not isinstance(raw, list):
-        return levels
-    for item in raw:
-        if not isinstance(item, (list, tuple)) or len(item) < 2:
-            continue
-        try:
-            price = _to_decimal(item[0])
-            quantity = _to_decimal(item[1])
-            level = DepthLevel(price=price, quantity=quantity)
-        except (InvalidOperation, TypeError, ValueError):
-            continue
-        levels.append(level)
-    return levels
-
-
-def order_book_from_api(payload: dict[str, Any]) -> OrderBook:
-    """Map depth payload to an OrderBook VO."""
-
-    bids = _parse_levels(payload.get("bids", []))
-    asks = _parse_levels(payload.get("asks", []))
-    return OrderBook(bids=bids, asks=asks)
-</file>
-
-<file path="src/app/infrastructure/exchange/mexc/settings.py">
-from typing import Literal
-
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-class MexcSettings(BaseSettings):
-    """Configuration for MEXC REST client."""
-
-    api_key: str = Field(alias="MEXC_API_KEY")
-    api_secret: str = Field(alias="MEXC_SECRET_KEY")
-    base_url: str = Field(default="https://api.mexc.com", alias="MEXC_BASE_URL")
-    recv_window: int = Field(default=5000, alias="MEXC_RECV_WINDOW")
-    timeout: int = Field(default=10, alias="MEXC_TIMEOUT")
-    max_connections: int = Field(default=20, alias="MEXC_MAX_CONNECTIONS", gt=0)
-    max_keepalive_connections: int = Field(default=10, alias="MEXC_MAX_KEEPALIVE", gt=0)
-    keepalive_expiry: float = Field(default=15.0, alias="MEXC_KEEPALIVE_EXPIRY", gt=0)
-    sub_account_mode: Literal["SPOT", "BROKER"] = Field(default="SPOT", alias="SUB_ACCOUNT_MODE")
-    sub_account_id: int | str | None = Field(default=None, alias="SUB_ACCOUNT_ID")
-    sub_account_name: str | None = Field(default=None, alias="SUB_ACCOUNT_NAME")
-
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-    @field_validator("sub_account_mode")
-    @classmethod
-    def _uppercase_mode(cls, value: str) -> str:
-        return value.upper()
-
-    @field_validator("sub_account_id", "sub_account_name")
-    @classmethod
-    def _empty_to_none(cls, value: str | int | None) -> str | int | None:
-        if isinstance(value, str) and value.strip() == "":
-            return None
-        return value
-
-    @field_validator("api_key", "api_secret")
-    @classmethod
-    def _strip_whitespace(cls, value: str) -> str:
-        cleaned = value.strip()
-        if "\n" in cleaned or "\r" in cleaned:
-            cleaned = cleaned.replace("\n", "").replace("\r", "")
-        return cleaned
-</file>
-
-<file path="src/app/interfaces/http/pages/static/js/pages/dashboard-renderers.js">
-(() => {
-  const $ = (id) => document.getElementById(id);
-  const setText = (id, v = "") => {
-    const el = $(id);
-    if (el) el.textContent = v;
-  };
-
-  const chartEl = $("klineChart");
-  const chart =
-    window.Chart && chartEl
-      ? new Chart(chartEl.getContext("2d"), {
-          type: "line",
-          data: { labels: [], datasets: [{ data: [], borderColor: "#2196f3", fill: false, tension: 0.2 }] },
-        })
-      : { data: { labels: [], datasets: [{ data: [] }] }, update() {} };
-
-  const setPrice = (d) => {
-    setText("price-error", "");
-    setText("bid", d?.bid ?? "--");
-    setText("ask", d?.ask ?? "--");
-    setText("last", d?.last ?? "--");
-    const raw = d?.timestamp;
-    const parsed = typeof raw === "number" || typeof raw === "string" ? new Date(raw) : new Date();
-    setText("timestamp", parsed.toISOString());
-  };
-
-  const setKlines = (items = []) => {
-    chart.data.labels = items.map((k) => new Date(k.timestamp).toLocaleTimeString());
-    chart.data.datasets[0].data = items.map((k) => Number(k.close));
-    chart.update();
-  };
-
-  const setBalances = (payload = {}) => {
-    setText("balance-error", "");
-    const balances = payload.balances || [];
-    const byAsset = (asset) => balances.find((b) => b.asset === asset) || { free: "--", locked: "--" };
-    const qrl = byAsset("QRL");
-    const usdt = byAsset("USDT");
-    setText("bal-qrl-free", qrl.free);
-    setText("bal-qrl-locked", qrl.locked);
-    setText("bal-usdt-free", usdt.free);
-    setText("bal-usdt-locked", usdt.locked);
-  };
-
-  const normalizeDepth = (item) => (Array.isArray(item) ? { price: item[0], qty: item[1] } : { price: item?.price ?? item?.p ?? "--", qty: item?.quantity ?? item?.q ?? "--" });
-
-  const setDepth = (payload = {}) => {
-    setText("depth-error", "");
-    const bidsEl = $("depth-bids");
-    const asksEl = $("depth-asks");
-    const build = (items = []) =>
-      items
-        .slice(0, 10)
-        .map((entry) => {
-          const { price, qty } = normalizeDepth(entry);
-          return `<li><span class="price">${price}</span><span class="qty">${qty}</span></li>`;
-        })
-        .join("");
-    if (bidsEl) bidsEl.innerHTML = build(payload.bids);
-    if (asksEl) asksEl.innerHTML = build(payload.asks);
-  };
-
-  const normalizeTrade = (t = {}) => {
-    const side = t.side ?? (t.isBuyerMaker === true ? "SELL" : t.isBuyerMaker === false ? "BUY" : "--");
-    const tsRaw = t.timestamp ?? t.time ?? Date.now();
-    return { price: t.price ?? t.p ?? "--", qty: t.quantity ?? t.q ?? "--", side, ts: typeof tsRaw === "string" ? tsRaw : new Date(tsRaw).toISOString() };
-  };
-
-  const setTrades = (payload = []) => {
-    setText("trades-error", "");
-    const el = $("trades-list");
-    if (!el) return;
-    el.innerHTML = payload
-      .slice(0, 20)
-      .map((t) => {
-        const n = normalizeTrade(t);
-        return `<li><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="ts">${n.ts}</span></li>`;
-      })
-      .join("");
-  };
-
-  const formatAmount = (price, qty, quote) => {
-    if (quote !== undefined && quote !== null) return quote;
-    const p = Number(price);
-    const q = Number(qty);
-    return Number.isFinite(p) && Number.isFinite(q) ? (p * q).toFixed(4) : "--";
-  };
-
-  const normalizeOrder = (o = {}) => {
-    const status = (o.status ?? "--").toString().toUpperCase();
-    const price = o.price ?? o.limit_price ?? o.avg_price ?? "--";
-    const qty = o.quantity ?? o.orig_qty ?? "--";
-    const quote =
-      o.cumulative_quote_quantity ??
-      o.cum_quote_quantity ??
-      o.cumulative_quote_qty ??
-      o.cummulativeQuoteQty ??
-      undefined;
-    return {
-      side: o.side ?? "--",
-      status,
-      price,
-      qty,
-      amount: formatAmount(price, qty, quote),
-      id: o.order_id ?? o.orderId ?? "--",
-      canCancel: !["CANCELED", "FILLED", "REJECTED", "EXPIRED"].includes(status),
-    };
-  };
-
-  const setOrders = (payload = []) => {
-    setText("orders-error", "");
-    const el = $("orders-list");
-    if (!el) return;
-    const header =
-      '<li class="orders-header"><span class="id">訂單ID</span><span class="side">方向</span><span class="price">價格</span><span class="qty">數量</span><span class="amount">金額</span><span class="status">狀態</span><span class="action">操作</span></li>';
-    el.innerHTML =
-      header +
-      payload
-        .slice(0, 20)
-        .map((o) => {
-          const n = normalizeOrder(o);
-          const action = n.canCancel
-            ? `<button class="order-cancel" data-order-id="${n.id}" aria-label="取消訂單 ${n.id}">取消</button>`
-            : `<span class="status-label">${n.status}</span>`;
-          return `<li data-order-id="${n.id}"><span class="id">${n.id}</span><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="amount">${n.amount}</span><span class="status">${n.status}</span><span class="action">${action}</span></li>`;
-        })
-        .join("");
-  };
-
-  window.dashboardUI = { setText, setPrice, setKlines, setBalances, setDepth, setTrades, setOrders };
-})();
-</file>
-
-<file path="src/app/interfaces/http/schemas.py">
-"""Pydantic schemas for interface layer requests/responses."""
-
-from datetime import datetime
-from decimal import Decimal
-from typing import Literal
-
-from pydantic import BaseModel, ConfigDict, Field
-
-
-class PlaceOrderRequest(BaseModel):
-    symbol: str = Field(default="QRLUSDT", description="Trading symbol")
-    side: Literal["BUY", "SELL"]
-    order_type: Literal["LIMIT", "MARKET"] = Field(default="LIMIT", alias="type")
-    quantity: Decimal
-    price: Decimal | None = None
-    time_in_force: Literal["GTC", "IOC", "FOK"] | None = Field(default="GTC", alias="timeInForce")
-    client_order_id: str | None = Field(default=None, alias="clientOrderId")
-
-
-class CancelOrderRequest(BaseModel):
-    symbol: str = Field(default="QRLUSDT", description="Trading symbol")
-    order_id: str | None = Field(default=None, alias="orderId")
-    client_order_id: str | None = Field(default=None, alias="clientOrderId")
-
-
-class GetOrderRequest(BaseModel):
-    symbol: str = Field(default="QRLUSDT", description="Trading symbol")
-    order_id: str | None = Field(default=None, alias="orderId")
-    client_order_id: str | None = Field(default=None, alias="clientOrderId")
-
-
-class ListTradesRequest(BaseModel):
-    symbol: str = Field(default="QRLUSDT", description="Trading symbol")
-
-
-class AllocationResponse(BaseModel):
-    """Response returned when the allocation task is triggered."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    request_id: str = Field(description="Identifier for the allocation trigger")
-    status: str = Field(description="Execution status for the allocation task")
-    executed_at: datetime = Field(description="UTC timestamp when the task executed")
-    action: str = Field(description="Trade action executed (BUY, SELL, SKIP, REJECTED)")
-    order_id: str | None = Field(default=None, description="Order identifier returned by the exchange")
-    reason: str | None = Field(default=None, description="Reason when action is skipped or rejected")
-    slippage_pct: Decimal | None = Field(
-        default=None, description="Calculated slippage percentage for the planned order"
-    )
-    expected_fill: Decimal | None = Field(
-        default=None, description="Expected fill quantity based on current depth"
-    )
-</file>
-
-<file path="src/app/interfaces/tasks/entrypoints.py">
-"""HTTP/Scheduler entrypoints for background tasks."""
-
-import asyncio
-import os
-
-from src.app.application.system.use_cases.allocation import AllocationResult, AllocationUseCase
-
-
-def _allocation_timeout_seconds() -> float:
-    """Read the scheduler task timeout from the environment."""
-    raw: str | None = os.getenv("TASK_TIMEOUT_SECONDS", "20")
-    try:
-        return float(raw)
-    except ValueError:
-        return 20.0
-
-
-async def run_allocation(timeout_seconds: float | None = None) -> AllocationResult:
-    """Trigger the allocation use case for Cloud Scheduler with a bounded runtime."""
-    usecase = AllocationUseCase()
-    timeout = timeout_seconds or _allocation_timeout_seconds()
-    return await asyncio.wait_for(usecase.execute(), timeout=timeout)
 </file>
 
 <file path="src/app/infrastructure/exchange/mexc/rest_client.py">
@@ -6082,6 +5810,347 @@ async def qrl_summary(
         "trades": trades,
         "market_trades": market_trades[:trades_limit],
     }
+</file>
+
+<file path="src/app/interfaces/http/pages/static/js/pages/dashboard-renderers.js">
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const setText = (id, v = "") => {
+    const el = $(id);
+    if (el) el.textContent = v;
+  };
+
+  const chartEl = $("klineChart");
+  const chart =
+    window.Chart && chartEl
+      ? new Chart(chartEl.getContext("2d"), {
+          type: "line",
+          data: { labels: [], datasets: [{ data: [], borderColor: "#2196f3", fill: false, tension: 0.2 }] },
+        })
+      : { data: { labels: [], datasets: [{ data: [] }] }, update() {} };
+
+  const setPrice = (d) => {
+    setText("price-error", "");
+    setText("bid", d?.bid ?? "--");
+    setText("ask", d?.ask ?? "--");
+    setText("last", d?.last ?? "--");
+    const raw = d?.timestamp;
+    const parsed = typeof raw === "number" || typeof raw === "string" ? new Date(raw) : new Date();
+    setText("timestamp", parsed.toISOString());
+  };
+
+  const setKlines = (items = []) => {
+    chart.data.labels = items.map((k) => new Date(k.timestamp).toLocaleTimeString());
+    chart.data.datasets[0].data = items.map((k) => Number(k.close));
+    chart.update();
+  };
+
+  const setBalances = (payload = {}) => {
+    setText("balance-error", "");
+    const balances = payload.balances || [];
+    const byAsset = (asset) => balances.find((b) => b.asset === asset) || { free: "--", locked: "--" };
+    const qrl = byAsset("QRL");
+    const usdt = byAsset("USDT");
+    setText("bal-qrl-free", qrl.free);
+    setText("bal-qrl-locked", qrl.locked);
+    setText("bal-usdt-free", usdt.free);
+    setText("bal-usdt-locked", usdt.locked);
+  };
+
+  const normalizeDepth = (item) => (Array.isArray(item) ? { price: item[0], qty: item[1] } : { price: item?.price ?? item?.p ?? "--", qty: item?.quantity ?? item?.q ?? "--" });
+
+  const setDepth = (payload = {}) => {
+    setText("depth-error", "");
+    const bidsEl = $("depth-bids");
+    const asksEl = $("depth-asks");
+    const build = (items = []) =>
+      items
+        .slice(0, 10)
+        .map((entry) => {
+          const { price, qty } = normalizeDepth(entry);
+          return `<li><span class="price">${price}</span><span class="qty">${qty}</span></li>`;
+        })
+        .join("");
+    if (bidsEl) bidsEl.innerHTML = build(payload.bids);
+    if (asksEl) asksEl.innerHTML = build(payload.asks);
+  };
+
+  const normalizeTrade = (t = {}) => {
+    const side = t.side ?? (t.isBuyerMaker === true ? "SELL" : t.isBuyerMaker === false ? "BUY" : "--");
+    const tsRaw = t.timestamp ?? t.time ?? Date.now();
+    return { price: t.price ?? t.p ?? "--", qty: t.quantity ?? t.q ?? "--", side, ts: typeof tsRaw === "string" ? tsRaw : new Date(tsRaw).toISOString() };
+  };
+
+  const setTrades = (payload = []) => {
+    setText("trades-error", "");
+    const el = $("trades-list");
+    if (!el) return;
+    el.innerHTML = payload
+      .slice(0, 20)
+      .map((t) => {
+        const n = normalizeTrade(t);
+        return `<li><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="ts">${n.ts}</span></li>`;
+      })
+      .join("");
+  };
+
+  const formatAmount = (price, qty, quote) => {
+    if (quote !== undefined && quote !== null) return quote;
+    const p = Number(price);
+    const q = Number(qty);
+    return Number.isFinite(p) && Number.isFinite(q) ? (p * q).toFixed(4) : "--";
+  };
+
+  const normalizeOrder = (o = {}) => {
+    const status = (o.status ?? "--").toString().toUpperCase();
+    const price = o.price ?? o.limit_price ?? o.avg_price ?? "--";
+    const qty = o.quantity ?? o.orig_qty ?? "--";
+    const quote =
+      o.cumulative_quote_quantity ??
+      o.cum_quote_quantity ??
+      o.cumulative_quote_qty ??
+      o.cummulativeQuoteQty ??
+      undefined;
+    return {
+      side: o.side ?? "--",
+      status,
+      price,
+      qty,
+      amount: formatAmount(price, qty, quote),
+      id: o.order_id ?? o.orderId ?? "--",
+      canCancel: !["CANCELED", "FILLED", "REJECTED", "EXPIRED"].includes(status),
+    };
+  };
+
+  const setOrders = (payload = []) => {
+    setText("orders-error", "");
+    const el = $("orders-list");
+    if (!el) return;
+    const header =
+      '<li class="orders-header"><span class="id">訂單ID</span><span class="side">方向</span><span class="price">價格</span><span class="qty">數量</span><span class="amount">金額</span><span class="status">狀態</span><span class="action">操作</span></li>';
+    el.innerHTML =
+      header +
+      payload
+        .slice(0, 20)
+        .map((o) => {
+          const n = normalizeOrder(o);
+          const action = n.canCancel
+            ? `<button class="order-cancel" data-order-id="${n.id}" aria-label="取消訂單 ${n.id}">取消</button>`
+            : `<span class="status-label">${n.status}</span>`;
+          return `<li data-order-id="${n.id}"><span class="id">${n.id}</span><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="amount">${n.amount}</span><span class="status">${n.status}</span><span class="action">${action}</span></li>`;
+        })
+        .join("");
+  };
+
+  window.dashboardUI = { setText, setPrice, setKlines, setBalances, setDepth, setTrades, setOrders };
+})();
+</file>
+
+<file path="src/app/interfaces/http/schemas.py">
+"""Pydantic schemas for interface layer requests/responses."""
+
+from datetime import datetime
+from decimal import Decimal
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class PlaceOrderRequest(BaseModel):
+    symbol: str = Field(default="QRLUSDT", description="Trading symbol")
+    side: Literal["BUY", "SELL"]
+    order_type: Literal["LIMIT", "MARKET"] = Field(default="LIMIT", alias="type")
+    quantity: Decimal
+    price: Decimal | None = None
+    time_in_force: Literal["GTC", "IOC", "FOK"] | None = Field(default="GTC", alias="timeInForce")
+    client_order_id: str | None = Field(default=None, alias="clientOrderId")
+
+
+class CancelOrderRequest(BaseModel):
+    symbol: str = Field(default="QRLUSDT", description="Trading symbol")
+    order_id: str | None = Field(default=None, alias="orderId")
+    client_order_id: str | None = Field(default=None, alias="clientOrderId")
+
+
+class GetOrderRequest(BaseModel):
+    symbol: str = Field(default="QRLUSDT", description="Trading symbol")
+    order_id: str | None = Field(default=None, alias="orderId")
+    client_order_id: str | None = Field(default=None, alias="clientOrderId")
+
+
+class ListTradesRequest(BaseModel):
+    symbol: str = Field(default="QRLUSDT", description="Trading symbol")
+
+
+class AllocationResponse(BaseModel):
+    """Response returned when the allocation task is triggered."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    request_id: str = Field(description="Identifier for the allocation trigger")
+    status: str = Field(description="Execution status for the allocation task")
+    executed_at: datetime = Field(description="UTC timestamp when the task executed")
+    action: str = Field(description="Trade action executed (BUY, SELL, SKIP, REJECTED)")
+    order_id: str | None = Field(default=None, description="Order identifier returned by the exchange")
+    reason: str | None = Field(default=None, description="Reason when action is skipped or rejected")
+    slippage_pct: Decimal | None = Field(
+        default=None, description="Calculated slippage percentage for the planned order"
+    )
+    expected_fill: Decimal | None = Field(
+        default=None, description="Expected fill quantity based on current depth"
+    )
+</file>
+
+<file path="src/app/interfaces/tasks/entrypoints.py">
+"""HTTP/Scheduler entrypoints for background tasks."""
+
+import asyncio
+import os
+
+from src.app.application.system.use_cases.allocation import AllocationResult, AllocationUseCase
+
+
+def _allocation_timeout_seconds() -> float:
+    """Read the scheduler task timeout from the environment."""
+    raw: str | None = os.getenv("TASK_TIMEOUT_SECONDS", "20")
+    try:
+        return float(raw)
+    except ValueError:
+        return 20.0
+
+
+async def run_allocation(timeout_seconds: float | None = None) -> AllocationResult:
+    """Trigger the allocation use case for Cloud Scheduler with a bounded runtime."""
+    usecase = AllocationUseCase()
+    timeout = timeout_seconds or _allocation_timeout_seconds()
+    return await asyncio.wait_for(usecase.execute(), timeout=timeout)
+</file>
+
+<file path="src/app/infrastructure/exchange/mexc/mappers.py">
+"""Mapping helpers between MEXC API payloads and domain objects."""
+
+from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
+from typing import Any
+
+from src.app.domain.entities.account import Account
+from src.app.domain.entities.order import Order
+from src.app.domain.entities.trade import Trade
+from src.app.domain.value_objects.balance import Balance
+from src.app.domain.value_objects.order_book import DepthLevel, OrderBook
+from src.app.domain.value_objects.order_id import OrderId
+from src.app.domain.value_objects.order_status import OrderStatus
+from src.app.domain.value_objects.order_type import OrderType
+from src.app.domain.value_objects.quantity import Quantity
+from src.app.domain.value_objects.side import Side
+from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.time_in_force import TimeInForce
+from src.app.domain.value_objects.timestamp import Timestamp
+from src.app.domain.value_objects.trade_id import TradeId
+from src.app.domain.value_objects.qrl_price import QrlPrice
+
+
+def _to_decimal(value: Any) -> Decimal:
+    return Decimal(str(value))
+
+
+def _to_timestamp_from_ms(value: int | float | str) -> Timestamp:
+    if value in (None, "", 0):
+        ms_value = 0
+    else:
+        try:
+            ms_value = int(value)
+        except (TypeError, ValueError):
+            ms_value = 0
+    dt = datetime.fromtimestamp(ms_value / 1000, tz=timezone.utc)
+    return Timestamp(dt)
+
+
+def server_time_to_timestamp(payload: dict[str, Any]) -> Timestamp:
+    return _to_timestamp_from_ms(payload.get("serverTime", 0))
+
+
+def account_from_api(payload: dict[str, Any]) -> Account:
+    balances = [
+        Balance(asset=item["asset"], free=_to_decimal(item["free"]), locked=_to_decimal(item["locked"]))
+        for item in payload.get("balances", [])
+    ]
+    return Account(
+        can_trade=bool(payload.get("canTrade", True)),
+        update_time=_to_timestamp_from_ms(payload.get("updateTime", 0)),
+        balances=balances,
+    )
+
+
+def order_from_api(payload: dict[str, Any]) -> Order:
+    order_id_value = payload.get("orderId")
+    if order_id_value is None:
+        raise ValueError("orderId is required in MEXC response")
+    price_raw = payload.get("price", payload.get("origPrice"))
+    price_vo: QrlPrice | None = None
+    if price_raw not in (None, "", 0, "0"):
+        try:
+            price_vo = QrlPrice(_to_decimal(price_raw))
+        except (InvalidOperation, ValueError):
+            price_vo = None
+    return Order(
+        order_id=OrderId(str(order_id_value)),
+        symbol=Symbol(payload.get("symbol", "QRLUSDT")),
+        side=Side(payload.get("side", "BUY")),
+        order_type=OrderType(payload.get("type", "LIMIT")),
+        status=OrderStatus(payload.get("status", "NEW")),
+        price=price_vo,
+        quantity=Quantity(_to_decimal(payload.get("origQty", payload.get("quantity", "0.00000001")))),
+        time_in_force=TimeInForce(payload["timeInForce"]) if payload.get("timeInForce") else None,
+        created_at=_to_timestamp_from_ms(payload.get("transactTime", payload.get("createTime", 0))),
+        client_order_id=payload.get("clientOrderId") or payload.get("origClientOrderId"),
+        executed_quantity=_to_decimal(payload.get("executedQty", "0"))
+        if payload.get("executedQty") is not None
+        else None,
+        cumulative_quote_quantity=_to_decimal(payload.get("cummulativeQuoteQty", "0"))
+        if payload.get("cummulativeQuoteQty") is not None
+        else None,
+        updated_at=_to_timestamp_from_ms(payload["updateTime"]) if payload.get("updateTime") else None,
+    )
+
+
+def trade_from_api(payload: dict[str, Any]) -> Trade:
+    return Trade(
+        trade_id=TradeId(str(payload.get("id"))),
+        order_id=OrderId(str(payload.get("orderId"))),
+        symbol=Symbol(payload.get("symbol", "QRLUSDT")),
+        side=Side("BUY" if payload.get("isBuyer") else "SELL"),
+        price=QrlPrice(_to_decimal(payload.get("price", "0"))),
+        quantity=Quantity(_to_decimal(payload.get("qty", payload.get("quantity", "0")))),
+        fee=_to_decimal(payload["commission"]) if payload.get("commission") else None,
+        fee_asset=payload.get("commissionAsset"),
+        timestamp=_to_timestamp_from_ms(payload.get("time", 0)),
+    )
+
+
+def _parse_levels(raw: Any) -> list[DepthLevel]:
+    levels: list[DepthLevel] = []
+    if not isinstance(raw, list):
+        return levels
+    for item in raw:
+        if not isinstance(item, (list, tuple)) or len(item) < 2:
+            continue
+        try:
+            price = _to_decimal(item[0])
+            quantity = _to_decimal(item[1])
+            level = DepthLevel(price=price, quantity=quantity)
+        except (InvalidOperation, TypeError, ValueError):
+            continue
+        levels.append(level)
+    return levels
+
+
+def order_book_from_api(payload: dict[str, Any]) -> OrderBook:
+    """Map depth payload to an OrderBook VO."""
+
+    bids = _parse_levels(payload.get("bids", []))
+    asks = _parse_levels(payload.get("asks", []))
+    return OrderBook(bids=bids, asks=asks)
 </file>
 
 <file path="src/app/interfaces/http/pages/static/js/pages/dashboard.js">
@@ -6917,6 +6986,104 @@ button {
 }
 </file>
 
+<file path="src/app/interfaces/http/pages/templates/dashboard/index.html">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>QRL/USDT Dashboard</title>
+<link rel="stylesheet" href="/static/css/dashboard.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<a href="#maincontent" class="skip-link">Skip to content</a>
+<main id="maincontent" class="dashboard-grid">
+<div class="card price-card">
+<div class="price-row"><span class="label">買價</span><span id="bid" class="value">--</span></div>
+<div class="price-row"><span class="label">賣價</span><span id="ask" class="value">--</span></div>
+<div class="price-row"><span class="label">最新價</span><span id="last" class="value">--</span></div>
+<div class="price-row"><span class="label">更新時間</span><span id="timestamp" class="value">--</span></div>
+<div class="price-row error" id="price-error" aria-live="polite"></div>
+</div>
+<div class="card kline-card">
+<canvas id="klineChart" height="240"></canvas>
+</div>
+<div class="card depth-card">
+<h2>深度</h2>
+<div class="vertical-stack">
+<div class="label">賣盤</div>
+<ul id="depth-asks" class="depth-list"></ul>
+<div class="label">買盤</div>
+<ul id="depth-bids" class="depth-list"></ul>
+</div>
+<div class="price-row error" id="depth-error" aria-live="polite"></div>
+</div>
+<div class="card trades-card">
+<h2>近期成交</h2>
+<ul id="trades-list" class="trades-list"></ul>
+<div class="price-row error" id="trades-error" aria-live="polite"></div>
+</div>
+<div class="card orders-card">
+<h2>我的訂單</h2>
+<ul id="orders-list" class="orders-list"></ul>
+<div class="price-row error" id="orders-error" aria-live="polite"></div>
+</div>
+<div class="card balance-card">
+<h2>餘額</h2>
+<div class="price-row"><span class="label">QRL 可用</span><span id="bal-qrl-free" class="value">--</span></div>
+<div class="price-row"><span class="label">QRL 凍結</span><span id="bal-qrl-locked" class="value">--</span></div>
+<div class="price-row"><span class="label">USDT 可用</span><span id="bal-usdt-free" class="value">--</span></div>
+<div class="price-row"><span class="label">USDT 凍結</span><span id="bal-usdt-locked" class="value">--</span></div>
+<div class="price-row error" id="balance-error" aria-live="polite"></div>
+</div>
+<div class="card order-card">
+<h2>下單</h2>
+<form id="orderForm">
+<div class="form-row">
+<label>方向</label>
+<div class="side-toggle" role="group" aria-label="Side">
+<button type="button" data-side="BUY" class="side-btn active">買入</button>
+<button type="button" data-side="SELL" class="side-btn">賣出</button>
+</div>
+<input type="hidden" name="side" value="BUY" />
+</div>
+<div class="form-row">
+<label>類型</label>
+<select name="order_type">
+<option value="LIMIT">LIMIT</option>
+<option value="MARKET">MARKET</option>
+</select>
+</div>
+<div class="form-row">
+<label>數量</label>
+<input name="quantity" type="number" step="0.0001" required />
+</div>
+<div class="form-row">
+<label>價格</label>
+<input name="price" type="number" step="0.0001" />
+</div>
+<div class="form-row">
+<label>有效期限</label>
+<select name="time_in_force">
+<option value="GTC">GTC</option>
+<option value="IOC">IOC</option>
+<option value="FOK">FOK</option>
+</select>
+</div>
+<button type="submit">送出</button>
+<div id="orderResult" class="order-result"></div>
+</form>
+</div>
+</main>
+<script id="dashboard-config" type="application/json">{{ dashboard_config | tojson }}</script>
+<script src="/static/js/pages/dashboard-config.js" defer></script>
+<script src="/static/js/domain/order.js" defer></script>
+<script src="/static/js/pages/dashboard-renderers.js" defer></script>
+<script src="/static/js/pages/dashboard.js" defer></script>
+</body>
+</html>
+</file>
+
 <file path="tests/test_allocation_use_case.py">
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -7099,104 +7266,6 @@ async def test_allocation_rejects_when_price_unavailable(monkeypatch):
     assert result.status == "rejected"
     assert result.reason == "Price unavailable"
     assert service.last_order_request is None
-</file>
-
-<file path="src/app/interfaces/http/pages/templates/dashboard/index.html">
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<title>QRL/USDT Dashboard</title>
-<link rel="stylesheet" href="/static/css/dashboard.css" />
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-<a href="#maincontent" class="skip-link">Skip to content</a>
-<main id="maincontent" class="dashboard-grid">
-<div class="card price-card">
-<div class="price-row"><span class="label">買價</span><span id="bid" class="value">--</span></div>
-<div class="price-row"><span class="label">賣價</span><span id="ask" class="value">--</span></div>
-<div class="price-row"><span class="label">最新價</span><span id="last" class="value">--</span></div>
-<div class="price-row"><span class="label">更新時間</span><span id="timestamp" class="value">--</span></div>
-<div class="price-row error" id="price-error" aria-live="polite"></div>
-</div>
-<div class="card kline-card">
-<canvas id="klineChart" height="240"></canvas>
-</div>
-<div class="card depth-card">
-<h2>深度</h2>
-<div class="vertical-stack">
-<div class="label">賣盤</div>
-<ul id="depth-asks" class="depth-list"></ul>
-<div class="label">買盤</div>
-<ul id="depth-bids" class="depth-list"></ul>
-</div>
-<div class="price-row error" id="depth-error" aria-live="polite"></div>
-</div>
-<div class="card trades-card">
-<h2>近期成交</h2>
-<ul id="trades-list" class="trades-list"></ul>
-<div class="price-row error" id="trades-error" aria-live="polite"></div>
-</div>
-<div class="card orders-card">
-<h2>我的訂單</h2>
-<ul id="orders-list" class="orders-list"></ul>
-<div class="price-row error" id="orders-error" aria-live="polite"></div>
-</div>
-<div class="card balance-card">
-<h2>餘額</h2>
-<div class="price-row"><span class="label">QRL 可用</span><span id="bal-qrl-free" class="value">--</span></div>
-<div class="price-row"><span class="label">QRL 凍結</span><span id="bal-qrl-locked" class="value">--</span></div>
-<div class="price-row"><span class="label">USDT 可用</span><span id="bal-usdt-free" class="value">--</span></div>
-<div class="price-row"><span class="label">USDT 凍結</span><span id="bal-usdt-locked" class="value">--</span></div>
-<div class="price-row error" id="balance-error" aria-live="polite"></div>
-</div>
-<div class="card order-card">
-<h2>下單</h2>
-<form id="orderForm">
-<div class="form-row">
-<label>方向</label>
-<div class="side-toggle" role="group" aria-label="Side">
-<button type="button" data-side="BUY" class="side-btn active">買入</button>
-<button type="button" data-side="SELL" class="side-btn">賣出</button>
-</div>
-<input type="hidden" name="side" value="BUY" />
-</div>
-<div class="form-row">
-<label>類型</label>
-<select name="order_type">
-<option value="LIMIT">LIMIT</option>
-<option value="MARKET">MARKET</option>
-</select>
-</div>
-<div class="form-row">
-<label>數量</label>
-<input name="quantity" type="number" step="0.0001" required />
-</div>
-<div class="form-row">
-<label>價格</label>
-<input name="price" type="number" step="0.0001" />
-</div>
-<div class="form-row">
-<label>有效期限</label>
-<select name="time_in_force">
-<option value="GTC">GTC</option>
-<option value="IOC">IOC</option>
-<option value="FOK">FOK</option>
-</select>
-</div>
-<button type="submit">送出</button>
-<div id="orderResult" class="order-result"></div>
-</form>
-</div>
-</main>
-<script id="dashboard-config" type="application/json">{{ dashboard_config | tojson }}</script>
-<script src="/static/js/pages/dashboard-config.js" defer></script>
-<script src="/static/js/domain/order.js" defer></script>
-<script src="/static/js/pages/dashboard-renderers.js" defer></script>
-<script src="/static/js/pages/dashboard.js" defer></script>
-</body>
-</html>
 </file>
 
 </files>
