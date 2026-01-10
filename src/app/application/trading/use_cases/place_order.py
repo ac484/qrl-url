@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from src.app.application.exchange.mexc_service import MexcService, PlaceOrderRequest, build_mexc_service
+from src.app.application.trading.dtos import OrderDTO
 from src.app.domain.entities.order import Order
 from src.app.domain.value_objects.order_type import OrderType
 from src.app.domain.value_objects.price import Price
@@ -15,23 +16,24 @@ from src.app.infrastructure.exchange.mexc.settings import MexcSettings
 
 
 def _serialize_order(order: Order) -> dict:
-    return {
-        "order_id": order.order_id.value,
-        "symbol": order.symbol.value,
-        "side": order.side.value,
-        "type": order.order_type.value,
-        "status": order.status.value,
-        "price": str(order.price),
-        "quantity": str(order.quantity.value),
-        "executed_quantity": str(order.executed_quantity) if order.executed_quantity else None,
-        "cumulative_quote_quantity": str(order.cumulative_quote_quantity)
+    dto = OrderDTO(
+        order_id=order.order_id.value,
+        symbol=order.symbol.value,
+        side=order.side.value,
+        type=order.order_type.value,
+        status=order.status.value,
+        price=str(order.price.value) if order.price else None,
+        quantity=str(order.quantity.value),
+        executed_quantity=str(order.executed_quantity) if order.executed_quantity else None,
+        cumulative_quote_quantity=str(order.cumulative_quote_quantity)
         if order.cumulative_quote_quantity
         else None,
-        "time_in_force": order.time_in_force.value if order.time_in_force else None,
-        "client_order_id": order.client_order_id,
-        "created_at": order.created_at.value.isoformat(),
-        "updated_at": order.updated_at.value.isoformat() if order.updated_at else None,
-    }
+        client_order_id=order.client_order_id,
+        created_at=order.created_at.value.isoformat(),
+        updated_at=order.updated_at.value.isoformat() if order.updated_at else None,
+        time_in_force=order.time_in_force.value if order.time_in_force else None,
+    )
+    return dto.to_dict()
 
 
 @dataclass

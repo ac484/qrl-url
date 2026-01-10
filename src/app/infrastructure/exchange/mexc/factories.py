@@ -13,6 +13,11 @@ from typing import Iterable, Optional
 from src.app.domain.aggregates.account_state import AccountState
 from src.app.domain.aggregates.market_snapshot import MarketSnapshot
 from src.app.domain.aggregates.trading_session import TradingSession
+from src.app.domain.factories.aggregates import (
+    build_account_state,
+    build_market_snapshot,
+    build_trading_session,
+)
 from src.app.domain.entities.account import Account
 from src.app.domain.entities.kline import Kline
 from src.app.domain.entities.order import Order
@@ -96,13 +101,12 @@ def market_snapshot_from_sources(
                 ts=_default_timestamp().value,
             )
 
-    return MarketSnapshot(
+    return build_market_snapshot(
         symbol=symbol,
         bids=bids,
         asks=asks,
         trades=list(trades or []),
         ticker=ticker,
-        updated_at=_default_timestamp(),
     )
 
 
@@ -131,12 +135,7 @@ def account_state_from_proto(
         update_time=_default_timestamp(),
         balances=balances,
     )
-    return AccountState(
-        symbol=symbol,
-        account=account,
-        open_orders=[],
-        updated_at=_default_timestamp(),
-    )
+    return build_account_state(symbol=symbol, account=account, open_orders=[])
 
 
 def trading_session_from_orders(
@@ -144,13 +143,7 @@ def trading_session_from_orders(
 ) -> TradingSession:
     """Create a TradingSession aggregate from existing order/trade records."""
 
-    return TradingSession(
-        symbol=symbol,
-        open_orders=list(orders or []),
-        trades=list(trades or []),
-        started_at=_default_timestamp(),
-        last_activity_at=_default_timestamp(),
-    )
+    return build_trading_session(symbol=symbol, orders=orders or [], trades=trades or [])
 
 
 def trades_from_public_proto(

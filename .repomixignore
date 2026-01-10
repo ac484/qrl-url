@@ -10,12 +10,17 @@ tests/
 *.md
 *.json
 *.txt
-
-Makefile
+*.proto
+*.css
 
 .env.example
 .gitattributes
 .gitignore
 .repomixignore
+.gitkeep
 
+Dockerfile
+Makefile
+LICENSE
 
+cloudbuild.yaml
