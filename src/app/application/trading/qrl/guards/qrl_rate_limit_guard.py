@@ -1,3 +1,3 @@
-def enforce_rate_limit(remaining_requests: int) -> None:
-    if remaining_requests <= 0:
-        raise ValueError("Rate limit reached for QRL operations")
+from src.app.domain.services.qrl_guards import enforce_rate_limit
+
+__all__ = ["enforce_rate_limit"]
