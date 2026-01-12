@@ -1,2 +1,1 @@
-User request: Ensure project complies 100% with AGENTS.md using repo-context.xml with server-sequential-thinking & Software-planning-mcp after reviewing code batches.
-Repo: ac484/qrl-url at /home/runner/work/qrl-url/qrl-url
+User request: Analyze current /tasks/allocation chain. Explain order placement logic and quantity calculation. Propose optimizations to minimize atomic order amount to avoid detection and reduce long-lived orders. Provide design in RP.
