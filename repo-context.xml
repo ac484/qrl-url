@@ -2196,6 +2196,93 @@ def register_all_routers(app: FastAPI) -> None:
 """HTML page controllers."""
 </file>
 
+<file path="src/app/interfaces/http/pages/dashboard_routes.py">
+from pathlib import Path
+from typing import Any
+
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+
+router = APIRouter()
+templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+
+def _dashboard_config() -> dict[str, Any]:
+    return {
+        "price_url": "/api/qrl/price",
+        "kline_url": "/api/qrl/kline?interval=1m&limit=50",
+        "order_url": "/api/qrl/orders",
+        "balance_url": "/api/account/balance",
+        "depth_url": "/api/market/depth?limit=20",
+        "trades_url": "/api/market/trades?limit=50",
+        "orders_url": "/api/trading/orders",
+        "refresh_ms": 10_000,
+    }
+
+
+@router.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request) -> HTMLResponse:
+    """Serve the trading dashboard page."""
+    return templates.TemplateResponse(
+        "dashboard/index.html",
+        {"request": request, "dashboard_config": _dashboard_config()},
+    )
+</file>
+
+<file path="src/app/interfaces/http/pages/static/js/application/dashboard.js">
+
+</file>
+
+<file path="src/app/interfaces/http/pages/static/js/core/chart.js">
+
+</file>
+
+<file path="src/app/interfaces/http/pages/static/js/core/dom.js">
+
+</file>
+
+<file path="src/app/interfaces/http/pages/static/js/core/http.js">
+
+</file>
+
+<file path="src/app/interfaces/http/pages/static/js/domain/depth.js">
+
+</file>
+
+<file path="src/app/interfaces/http/pages/static/js/domain/price.js">
+
+</file>
+
+<file path="src/app/interfaces/http/pages/static/js/domain/trade.js">
+
+</file>
+
+<file path="src/app/interfaces/http/pages/static/js/pages/dashboard-config.js">
+(() => {
+  const el = document.getElementById("dashboard-config");
+  let data = {};
+  if (el) {
+    try {
+      data = JSON.parse(el.textContent || "{}");
+    } catch (err) {
+      console.error("Invalid dashboard config", err);
+    }
+  }
+
+  window.dashboardConfig = {
+    priceUrl: data.price_url || "/api/qrl/price",
+    klineUrl: data.kline_url || "/api/qrl/kline?interval=1m&limit=50",
+    orderUrl: data.order_url || "/api/qrl/orders",
+    balanceUrl: data.balance_url || "/api/account/balance",
+    depthUrl: data.depth_url || "/api/market/depth?limit=20",
+    tradesUrl: data.trades_url || "/api/market/trades?limit=50",
+    ordersUrl: data.orders_url || "/api/trading/orders",
+    refreshMs: data.refresh_ms || 10000,
+  };
+})();
+</file>
+
 <file path="src/app/interfaces/tasks/__init__.py">
 """Task interfaces placeholder."""
 </file>
@@ -2280,6 +2367,56 @@ class GetQrlKline:
             ]
             for k in klines
         ]
+</file>
+
+<file path="src/app/application/market/qrl/get_qrl_price.py">
+from dataclasses import asdict, dataclass
+from typing import Any
+
+from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.domain.value_objects.qrl_price import QrlPrice
+from src.app.domain.value_objects.qrl_usdt_pair import QrlUsdtPair
+from src.app.domain.value_objects.symbol import Symbol
+
+
+@dataclass(frozen=True)
+class QrlPriceSnapshot:
+    bid: str | None
+    ask: str | None
+    last: str
+    timestamp: int | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+class GetQrlPrice:
+    """Fetch QRL/USDT price using the dedicated REST client."""
+
+    def __init__(self, exchange_factory: ExchangeServiceFactory):
+        self._exchange_factory = exchange_factory
+
+    async def execute(self) -> QrlPriceSnapshot:
+        async with self._exchange_factory() as exchange:
+            ticker = await exchange.get_ticker_24h(Symbol(QrlUsdtPair.symbol()))
+        bid = ticker.get("bidPrice") or ticker.get("bid")
+        ask = ticker.get("askPrice") or ticker.get("ask")
+        last = ticker.get("lastPrice") or ticker.get("last")
+        if last is None:
+            raise ValueError("QRL price unavailable")
+        price_vo = QrlPrice(last)
+        timestamp = (
+            ticker.get("time")
+            or ticker.get("timestamp")
+            or ticker.get("closeTime")
+            or ticker.get("t")  # some SDKs return shorthand
+        )
+        return QrlPriceSnapshot(
+            bid=str(bid) if bid is not None else None,
+            ask=str(ask) if ask is not None else None,
+            last=str(price_vo.value),
+            timestamp=timestamp,
+        )
 </file>
 
 <file path="src/app/application/market/use_cases/get_depth.py">
@@ -2653,51 +2790,6 @@ __all__ = ["ensure_price_range"]
 from src.app.domain.services.qrl_guards import enforce_rate_limit
 
 __all__ = ["enforce_rate_limit"]
-</file>
-
-<file path="src/app/application/trading/qrl/place_qrl_order.py">
-from src.app.application.ports.exchange_service import ExchangeServiceFactory, PlaceOrderRequest
-from src.app.application.trading.use_cases.place_order import _serialize_order
-from src.app.domain.value_objects.order_type import OrderType
-from src.app.domain.value_objects.price import Price
-from src.app.domain.value_objects.qrl_price import QrlPrice
-from src.app.domain.value_objects.qrl_quantity import QrlQuantity
-from src.app.domain.value_objects.quantity import Quantity
-from src.app.domain.value_objects.side import Side
-from src.app.domain.value_objects.symbol import Symbol
-from src.app.domain.value_objects.time_in_force import TimeInForce
-
-
-class PlaceQrlOrder:
-    """Place QRL/USDT order with fixed symbol and validated VOs."""
-
-    def __init__(self, exchange_factory: ExchangeServiceFactory):
-        self._exchange_factory = exchange_factory
-
-    async def execute(
-        self,
-        *,
-        side: str,
-        order_type: str,
-        price: QrlPrice | None,
-        quantity: QrlQuantity,
-        time_in_force: str | None = "GTC",
-        client_order_id: str | None = None,
-    ) -> dict:
-        price_vo = Price.from_single(price.value) if price else None
-        quantity_vo = Quantity(quantity.value)
-        request = PlaceOrderRequest(
-            symbol=Symbol("QRLUSDT"),
-            side=Side(side),
-            order_type=OrderType(order_type),
-            price=price_vo,
-            quantity=quantity_vo,
-            time_in_force=TimeInForce(time_in_force) if time_in_force else None,
-            client_order_id=client_order_id,
-        )
-        async with self._exchange_factory() as exchange:
-            order = await exchange.place_order(request)
-        return _serialize_order(order)
 </file>
 
 <file path="src/app/application/trading/use_cases/cancel_order.py">
@@ -3813,90 +3905,21 @@ def get_exchange_factory() -> ExchangeServiceFactory:
     return build_exchange_factory()
 </file>
 
-<file path="src/app/interfaces/http/pages/dashboard_routes.py">
-from pathlib import Path
-from typing import Any
-
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-
-router = APIRouter()
-templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
-
-
-def _dashboard_config() -> dict[str, Any]:
-    return {
-        "price_url": "/api/qrl/price",
-        "kline_url": "/api/qrl/kline?interval=1m&limit=50",
-        "order_url": "/api/qrl/orders",
-        "balance_url": "/api/account/balance",
-        "depth_url": "/api/market/depth?limit=20",
-        "trades_url": "/api/market/trades?limit=50",
-        "orders_url": "/api/trading/orders",
-        "refresh_ms": 10_000,
-    }
-
-
-@router.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request) -> HTMLResponse:
-    """Serve the trading dashboard page."""
-    return templates.TemplateResponse(
-        "dashboard/index.html",
-        {"request": request, "dashboard_config": _dashboard_config()},
-    )
-</file>
-
-<file path="src/app/interfaces/http/pages/static/js/application/dashboard.js">
-
-</file>
-
-<file path="src/app/interfaces/http/pages/static/js/core/chart.js">
-
-</file>
-
-<file path="src/app/interfaces/http/pages/static/js/core/dom.js">
-
-</file>
-
-<file path="src/app/interfaces/http/pages/static/js/core/http.js">
-
-</file>
-
-<file path="src/app/interfaces/http/pages/static/js/domain/depth.js">
-
-</file>
-
-<file path="src/app/interfaces/http/pages/static/js/domain/price.js">
-
-</file>
-
-<file path="src/app/interfaces/http/pages/static/js/domain/trade.js">
-
-</file>
-
-<file path="src/app/interfaces/http/pages/static/js/pages/dashboard-config.js">
+<file path="src/app/interfaces/http/pages/static/js/domain/order.js">
 (() => {
-  const el = document.getElementById("dashboard-config");
-  let data = {};
-  if (el) {
-    try {
-      data = JSON.parse(el.textContent || "{}");
-    } catch (err) {
-      console.error("Invalid dashboard config", err);
+  const cancelOrder = async (cfg, orderId) => {
+    if (!orderId) throw new Error("orderId required");
+    const url = `${cfg.cancelOrderBase || "/api/trading/orders"}/${orderId}/cancel`;
+    const resp = await fetch(url, { method: "POST" });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const detail = data.detail || JSON.stringify(data);
+      throw new Error(detail);
     }
-  }
-
-  window.dashboardConfig = {
-    priceUrl: data.price_url || "/api/qrl/price",
-    klineUrl: data.kline_url || "/api/qrl/kline?interval=1m&limit=50",
-    orderUrl: data.order_url || "/api/qrl/orders",
-    balanceUrl: data.balance_url || "/api/account/balance",
-    depthUrl: data.depth_url || "/api/market/depth?limit=20",
-    tradesUrl: data.trades_url || "/api/market/trades?limit=50",
-    ordersUrl: data.orders_url || "/api/trading/orders",
-    refreshMs: data.refresh_ms || 10000,
+    return data;
   };
+
+  window.orderDomain = { cancelOrder };
 })();
 </file>
 
@@ -4015,54 +4038,56 @@ class GetBalanceUseCase:
         return _serialize_account(account, valuation)
 </file>
 
-<file path="src/app/application/market/qrl/get_qrl_price.py">
-from dataclasses import asdict, dataclass
-from typing import Any
+<file path="src/app/application/trading/qrl/place_qrl_order.py">
+from decimal import Decimal
 
-from src.app.application.ports.exchange_service import ExchangeServiceFactory
+from src.app.application.ports.exchange_service import ExchangeServiceFactory, PlaceOrderRequest
+from src.app.application.trading.use_cases.place_order import _serialize_order
+from src.app.domain.value_objects.order_type import OrderType
+from src.app.domain.value_objects.price import Price
 from src.app.domain.value_objects.qrl_price import QrlPrice
-from src.app.domain.value_objects.qrl_usdt_pair import QrlUsdtPair
+from src.app.domain.value_objects.qrl_quantity import QrlQuantity
+from src.app.domain.value_objects.quantity import Quantity
+from src.app.domain.value_objects.side import Side
 from src.app.domain.value_objects.symbol import Symbol
+from src.app.domain.value_objects.time_in_force import TimeInForce
 
 
-@dataclass(frozen=True)
-class QrlPriceSnapshot:
-    bid: str | None
-    ask: str | None
-    last: str
-    timestamp: int | None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-class GetQrlPrice:
-    """Fetch QRL/USDT price using the dedicated REST client."""
+class PlaceQrlOrder:
+    """Place QRL/USDT order with fixed symbol and validated VOs."""
 
     def __init__(self, exchange_factory: ExchangeServiceFactory):
         self._exchange_factory = exchange_factory
 
-    async def execute(self) -> QrlPriceSnapshot:
+    async def execute(
+        self,
+        *,
+        side: str,
+        order_type: str,
+        price: Decimal | str | float | QrlPrice | None,
+        quantity: Decimal | str | int | float | QrlQuantity,
+        time_in_force: str | None = "GTC",
+        client_order_id: str | None = None,
+    ) -> dict:
+        price_vo = None
+        if price is not None:
+            normalized_price = price if isinstance(price, QrlPrice) else QrlPrice(price)
+            price_vo = Price.from_single(normalized_price.value)
+
+        normalized_qty = quantity if isinstance(quantity, QrlQuantity) else QrlQuantity(quantity)
+        quantity_vo = Quantity(normalized_qty.value)
+        request = PlaceOrderRequest(
+            symbol=Symbol("QRLUSDT"),
+            side=Side(side),
+            order_type=OrderType(order_type),
+            price=price_vo,
+            quantity=quantity_vo,
+            time_in_force=TimeInForce(time_in_force) if time_in_force else None,
+            client_order_id=client_order_id,
+        )
         async with self._exchange_factory() as exchange:
-            ticker = await exchange.get_ticker_24h(Symbol(QrlUsdtPair.symbol()))
-        bid = ticker.get("bidPrice") or ticker.get("bid")
-        ask = ticker.get("askPrice") or ticker.get("ask")
-        last = ticker.get("lastPrice") or ticker.get("last")
-        if last is None:
-            raise ValueError("QRL price unavailable")
-        price_vo = QrlPrice(last)
-        timestamp = (
-            ticker.get("time")
-            or ticker.get("timestamp")
-            or ticker.get("closeTime")
-            or ticker.get("t")  # some SDKs return shorthand
-        )
-        return QrlPriceSnapshot(
-            bid=str(bid) if bid is not None else None,
-            ask=str(ask) if ask is not None else None,
-            last=str(price_vo.value),
-            timestamp=timestamp,
-        )
+            order = await exchange.place_order(request)
+        return _serialize_order(order)
 </file>
 
 <file path="src/app/domain/services/balance_comparison_rule.py">
@@ -4459,8 +4484,6 @@ from src.app.application.trading.qrl.place_qrl_order import PlaceQrlOrder
 from src.app.application.account.use_cases.get_balance import GetBalanceUseCase
 from src.app.application.trading.use_cases.list_orders import ListOrdersUseCase
 from src.app.application.trading.use_cases.list_trades import ListTradesUseCase
-from src.app.domain.value_objects.qrl_price import QrlPrice
-from src.app.domain.value_objects.qrl_quantity import QrlQuantity
 from src.app.interfaces.http.dependencies import get_exchange_factory
 from src.app.interfaces.http.schemas import PlaceOrderRequest
 
@@ -4512,13 +4535,11 @@ async def qrl_place_order(
     request: PlaceOrderRequest, exchange_factory: ExchangeServiceFactory = Depends(get_exchange_factory)
 ):
     usecase = PlaceQrlOrder(exchange_factory)
-    price_vo = QrlPrice(request.price) if request.price is not None else None
-    qty_vo = QrlQuantity(request.quantity)
     return await usecase.execute(
         side=request.side,
         order_type=request.order_type,
-        price=price_vo,
-        quantity=qty_vo,
+        price=request.price,
+        quantity=request.quantity,
         time_in_force=request.time_in_force,
         client_order_id=request.client_order_id,
     )
@@ -4580,22 +4601,363 @@ async def qrl_summary(
     }
 </file>
 
-<file path="src/app/interfaces/http/pages/static/js/domain/order.js">
+<file path="src/app/interfaces/http/pages/static/js/pages/dashboard-renderers.js">
 (() => {
-  const cancelOrder = async (cfg, orderId) => {
-    if (!orderId) throw new Error("orderId required");
-    const url = `${cfg.cancelOrderBase || "/api/trading/orders"}/${orderId}/cancel`;
-    const resp = await fetch(url, { method: "POST" });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      const detail = data.detail || JSON.stringify(data);
-      throw new Error(detail);
-    }
-    return data;
+  const $ = (id) => document.getElementById(id);
+  const setText = (id, v = "") => {
+    const el = $(id);
+    if (el) el.textContent = v;
   };
 
-  window.orderDomain = { cancelOrder };
+  const chartEl = $("klineChart");
+  const chart =
+    window.Chart && chartEl
+      ? new Chart(chartEl.getContext("2d"), {
+          type: "line",
+          data: { labels: [], datasets: [{ data: [], borderColor: "#2196f3", fill: false, tension: 0.2 }] },
+        })
+      : { data: { labels: [], datasets: [{ data: [] }] }, update() {} };
+
+  const setPrice = (d) => {
+    setText("price-error", "");
+    setText("bid", d?.bid ?? "--");
+    setText("ask", d?.ask ?? "--");
+    setText("last", d?.last ?? "--");
+    const raw = d?.timestamp;
+    const parsed = typeof raw === "number" || typeof raw === "string" ? new Date(raw) : new Date();
+    setText("timestamp", parsed.toISOString());
+  };
+
+  const setKlines = (items = []) => {
+    chart.data.labels = items.map((k) => new Date(k.timestamp).toLocaleTimeString());
+    chart.data.datasets[0].data = items.map((k) => Number(k.close));
+    chart.update();
+  };
+
+  const setBalances = (payload = {}) => {
+    setText("balance-error", "");
+    const balances = payload.balances || [];
+    const byAsset = (asset) => balances.find((b) => b.asset === asset) || { free: "--", locked: "--" };
+    const qrl = byAsset("QRL");
+    const usdt = byAsset("USDT");
+    setText("bal-qrl-free", qrl.free);
+    setText("bal-qrl-locked", qrl.locked);
+    setText("bal-usdt-free", usdt.free);
+    setText("bal-usdt-locked", usdt.locked);
+  };
+
+  const normalizeDepth = (item) => (Array.isArray(item) ? { price: item[0], qty: item[1] } : { price: item?.price ?? item?.p ?? "--", qty: item?.quantity ?? item?.q ?? "--" });
+
+  const setDepth = (payload = {}) => {
+    setText("depth-error", "");
+    const bidsEl = $("depth-bids");
+    const asksEl = $("depth-asks");
+    const build = (items = []) =>
+      items
+        .slice(0, 10)
+        .map((entry) => {
+          const { price, qty } = normalizeDepth(entry);
+          return `<li><span class="price">${price}</span><span class="qty">${qty}</span></li>`;
+        })
+        .join("");
+    if (bidsEl) bidsEl.innerHTML = build(payload.bids);
+    if (asksEl) asksEl.innerHTML = build(payload.asks);
+  };
+
+  const normalizeTrade = (t = {}) => {
+    const side = t.side ?? (t.isBuyerMaker === true ? "SELL" : t.isBuyerMaker === false ? "BUY" : "--");
+    const tsRaw = t.timestamp ?? t.time ?? Date.now();
+    return { price: t.price ?? t.p ?? "--", qty: t.quantity ?? t.q ?? "--", side, ts: typeof tsRaw === "string" ? tsRaw : new Date(tsRaw).toISOString() };
+  };
+
+  const setTrades = (payload = []) => {
+    setText("trades-error", "");
+    const el = $("trades-list");
+    if (!el) return;
+    el.innerHTML = payload
+      .slice(0, 20)
+      .map((t) => {
+        const n = normalizeTrade(t);
+        return `<li><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="ts">${n.ts}</span></li>`;
+      })
+      .join("");
+  };
+
+  const formatAmount = (price, qty, quote) => {
+    if (quote !== undefined && quote !== null) return quote;
+    const p = Number(price);
+    const q = Number(qty);
+    return Number.isFinite(p) && Number.isFinite(q) ? (p * q).toFixed(4) : "--";
+  };
+
+  const normalizeOrder = (o = {}) => {
+    const status = (o.status ?? "--").toString().toUpperCase();
+    const price = o.price ?? o.limit_price ?? o.avg_price ?? "--";
+    const qty = o.quantity ?? o.orig_qty ?? "--";
+    const quote =
+      o.cumulative_quote_quantity ??
+      o.cum_quote_quantity ??
+      o.cumulative_quote_qty ??
+      o.cummulativeQuoteQty ??
+      undefined;
+    return {
+      side: o.side ?? "--",
+      status,
+      price,
+      qty,
+      amount: formatAmount(price, qty, quote),
+      id: o.order_id ?? o.orderId ?? "--",
+      canCancel: !["CANCELED", "FILLED", "REJECTED", "EXPIRED"].includes(status),
+    };
+  };
+
+  const setOrders = (payload = []) => {
+    setText("orders-error", "");
+    const el = $("orders-list");
+    if (!el) return;
+    const header =
+      '<li class="orders-header"><span class="id">訂單ID</span><span class="side">方向</span><span class="price">價格</span><span class="qty">數量</span><span class="amount">金額</span><span class="status">狀態</span><span class="action">操作</span></li>';
+    el.innerHTML =
+      header +
+      payload
+        .slice(0, 20)
+        .map((o) => {
+          const n = normalizeOrder(o);
+          const action = n.canCancel
+            ? `<button class="order-cancel" data-order-id="${n.id}" aria-label="取消訂單 ${n.id}">取消</button>`
+            : `<span class="status-label">${n.status}</span>`;
+          return `<li data-order-id="${n.id}"><span class="id">${n.id}</span><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="amount">${n.amount}</span><span class="status">${n.status}</span><span class="action">${action}</span></li>`;
+        })
+        .join("");
+  };
+
+  window.dashboardUI = { setText, setPrice, setKlines, setBalances, setDepth, setTrades, setOrders };
 })();
+</file>
+
+<file path="src/app/interfaces/http/pages/static/js/pages/dashboard.js">
+(() => {
+  const cfg = window.dashboardConfig || {};
+  const ui = window.dashboardUI || {};
+  if (!ui.setPrice || !ui.setText) return;
+
+  const load = async (url) => {
+    const resp = await fetch(url);
+    let data = {};
+    try {
+      data = await resp.json();
+    } catch (_err) {
+      data = {};
+    }
+    return { ok: resp.ok, data };
+  };
+
+  const err = (id, detail, fallback) => ui.setText(id, detail || fallback);
+
+  async function refresh() {
+    try {
+      const [price, kline, bal, depth, trades, orders] = await Promise.all([
+        load(cfg.priceUrl),
+        load(cfg.klineUrl),
+        load(cfg.balanceUrl),
+        load(cfg.depthUrl),
+        load(cfg.tradesUrl),
+        load(cfg.ordersUrl),
+      ]);
+      price.ok ? ui.setPrice(price.data) : err("price-error", price.data.detail, "價格取得失敗");
+      kline.ok && ui.setKlines(kline.data);
+      bal.ok ? ui.setBalances(bal.data) : err("balance-error", bal.data.detail, "餘額取得失敗");
+      depth.ok ? ui.setDepth(depth.data) : err("depth-error", depth.data.detail, "Depth 取得失敗");
+      trades.ok ? ui.setTrades(trades.data) : err("trades-error", trades.data.detail, "Trades 取得失敗");
+      orders.ok ? ui.setOrders(orders.data) : err("orders-error", orders.data.detail, "Orders 取得失敗");
+    } catch (ex) {
+      ["price", "balance", "depth", "trades", "orders"].forEach((key) => err(`${key}-error`, null, "連線錯誤"));
+      console.error(ex);
+    }
+  }
+
+  const wireSideToggle = () => {
+    document.querySelectorAll(".side-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".side-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        const sideInput = document.querySelector('input[name="side"]');
+        if (sideInput) sideInput.value = btn.dataset.side;
+      });
+    });
+  };
+
+  const wireOrderForm = () => {
+    const form = document.getElementById("orderForm");
+    const resultEl = document.getElementById("orderResult");
+    if (!form || !resultEl) return;
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = {
+        symbol: "QRLUSDT",
+        side: form.side.value,
+        order_type: form.order_type.value,
+        quantity: form.quantity.value,
+        price: form.price.value || null,
+        time_in_force: form.time_in_force.value,
+      };
+      resultEl.textContent = "送出中...";
+      try {
+        const resp = await fetch(cfg.orderUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await resp.json().catch(() => ({}));
+        resultEl.textContent = resp.ok
+          ? `成功: orderId=${data.order_id || data.orderId || "N/A"}`
+          : `失敗: ${data.detail || JSON.stringify(data)}`;
+      } catch (ex) {
+        resultEl.textContent = `錯誤: ${ex}`;
+      }
+    });
+  };
+
+  const cancelOrder = async (orderId, button) => {
+    if (!orderId || !cfg.ordersUrl) return;
+    const url = `${cfg.ordersUrl}/${encodeURIComponent(orderId)}/cancel`;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = "取消中...";
+    try {
+      const resp = await fetch(url, { method: "POST" });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        err("orders-error", data.detail, "取消失敗");
+      } else {
+        ui.setText("orders-error", "");
+        refresh();
+      }
+    } catch (ex) {
+      err("orders-error", String(ex), "取消失敗");
+    } finally {
+      button.disabled = false;
+      button.textContent = originalText || "取消";
+    }
+  };
+
+  const wireOrderActions = () => {
+    const list = document.getElementById("orders-list");
+    if (!list) return;
+    list.addEventListener("click", (event) => {
+      const button = event.target.closest(".order-cancel");
+      if (!button) return;
+      const orderId = button.dataset.orderId;
+      cancelOrder(orderId, button);
+    });
+  };
+
+  document.addEventListener("DOMContentLoaded", () => {
+    wireSideToggle();
+    wireOrderForm();
+    wireOrderActions();
+    refresh();
+    setInterval(refresh, cfg.refreshMs || 10000);
+  });
+})();
+</file>
+
+<file path="src/app/interfaces/http/pages/templates/dashboard/index.html">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>QRL/USDT Dashboard</title>
+<link rel="stylesheet" href="/static/css/dashboard.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<a href="#maincontent" class="skip-link">Skip to content</a>
+<main id="maincontent" class="dashboard-grid">
+<div class="card price-card">
+<div class="price-row"><span class="label">買價</span><span id="bid" class="value">--</span></div>
+<div class="price-row"><span class="label">賣價</span><span id="ask" class="value">--</span></div>
+<div class="price-row"><span class="label">最新價</span><span id="last" class="value">--</span></div>
+<div class="price-row"><span class="label">更新時間</span><span id="timestamp" class="value">--</span></div>
+<div class="price-row error" id="price-error" aria-live="polite"></div>
+</div>
+<div class="card kline-card">
+<canvas id="klineChart" height="240"></canvas>
+</div>
+<div class="card depth-card">
+<h2>深度</h2>
+<div class="vertical-stack">
+<div class="label">賣盤</div>
+<ul id="depth-asks" class="depth-list"></ul>
+<div class="label">買盤</div>
+<ul id="depth-bids" class="depth-list"></ul>
+</div>
+<div class="price-row error" id="depth-error" aria-live="polite"></div>
+</div>
+<div class="card trades-card">
+<h2>近期成交</h2>
+<ul id="trades-list" class="trades-list"></ul>
+<div class="price-row error" id="trades-error" aria-live="polite"></div>
+</div>
+<div class="card orders-card">
+<h2>我的訂單</h2>
+<ul id="orders-list" class="orders-list"></ul>
+<div class="price-row error" id="orders-error" aria-live="polite"></div>
+</div>
+<div class="card balance-card">
+<h2>餘額</h2>
+<div class="price-row"><span class="label">QRL 可用</span><span id="bal-qrl-free" class="value">--</span></div>
+<div class="price-row"><span class="label">QRL 凍結</span><span id="bal-qrl-locked" class="value">--</span></div>
+<div class="price-row"><span class="label">USDT 可用</span><span id="bal-usdt-free" class="value">--</span></div>
+<div class="price-row"><span class="label">USDT 凍結</span><span id="bal-usdt-locked" class="value">--</span></div>
+<div class="price-row error" id="balance-error" aria-live="polite"></div>
+</div>
+<div class="card order-card">
+<h2>下單</h2>
+<form id="orderForm">
+<div class="form-row">
+<label>方向</label>
+<div class="side-toggle" role="group" aria-label="Side">
+<button type="button" data-side="BUY" class="side-btn active">買入</button>
+<button type="button" data-side="SELL" class="side-btn">賣出</button>
+</div>
+<input type="hidden" name="side" value="BUY" />
+</div>
+<div class="form-row">
+<label>類型</label>
+<select name="order_type">
+<option value="LIMIT">LIMIT</option>
+<option value="MARKET">MARKET</option>
+</select>
+</div>
+<div class="form-row">
+<label>數量</label>
+<input name="quantity" type="number" step="0.0001" required />
+</div>
+<div class="form-row">
+<label>價格</label>
+<input name="price" type="number" step="0.0001" />
+</div>
+<div class="form-row">
+<label>有效期限</label>
+<select name="time_in_force">
+<option value="GTC">GTC</option>
+<option value="IOC">IOC</option>
+<option value="FOK">FOK</option>
+</select>
+</div>
+<button type="submit">送出</button>
+<div id="orderResult" class="order-result"></div>
+</form>
+</div>
+</main>
+<script id="dashboard-config" type="application/json">{{ dashboard_config | tojson }}</script>
+<script src="/static/js/pages/dashboard-config.js" defer></script>
+<script src="/static/js/domain/order.js" defer></script>
+<script src="/static/js/pages/dashboard-renderers.js" defer></script>
+<script src="/static/js/pages/dashboard.js" defer></script>
+</body>
+</html>
 </file>
 
 <file path="main.py">
@@ -4929,238 +5291,6 @@ def order_book_from_api(payload: dict[str, Any]) -> OrderBook:
     return OrderBook(bids=bids, asks=asks)
 </file>
 
-<file path="src/app/interfaces/http/pages/static/js/pages/dashboard-renderers.js">
-(() => {
-  const $ = (id) => document.getElementById(id);
-  const setText = (id, v = "") => {
-    const el = $(id);
-    if (el) el.textContent = v;
-  };
-
-  const chartEl = $("klineChart");
-  const chart =
-    window.Chart && chartEl
-      ? new Chart(chartEl.getContext("2d"), {
-          type: "line",
-          data: { labels: [], datasets: [{ data: [], borderColor: "#2196f3", fill: false, tension: 0.2 }] },
-        })
-      : { data: { labels: [], datasets: [{ data: [] }] }, update() {} };
-
-  const setPrice = (d) => {
-    setText("price-error", "");
-    setText("bid", d?.bid ?? "--");
-    setText("ask", d?.ask ?? "--");
-    setText("last", d?.last ?? "--");
-    const raw = d?.timestamp;
-    const parsed = typeof raw === "number" || typeof raw === "string" ? new Date(raw) : new Date();
-    setText("timestamp", parsed.toISOString());
-  };
-
-  const setKlines = (items = []) => {
-    chart.data.labels = items.map((k) => new Date(k.timestamp).toLocaleTimeString());
-    chart.data.datasets[0].data = items.map((k) => Number(k.close));
-    chart.update();
-  };
-
-  const setBalances = (payload = {}) => {
-    setText("balance-error", "");
-    const balances = payload.balances || [];
-    const byAsset = (asset) => balances.find((b) => b.asset === asset) || { free: "--", locked: "--" };
-    const qrl = byAsset("QRL");
-    const usdt = byAsset("USDT");
-    setText("bal-qrl-free", qrl.free);
-    setText("bal-qrl-locked", qrl.locked);
-    setText("bal-usdt-free", usdt.free);
-    setText("bal-usdt-locked", usdt.locked);
-  };
-
-  const normalizeDepth = (item) => (Array.isArray(item) ? { price: item[0], qty: item[1] } : { price: item?.price ?? item?.p ?? "--", qty: item?.quantity ?? item?.q ?? "--" });
-
-  const setDepth = (payload = {}) => {
-    setText("depth-error", "");
-    const bidsEl = $("depth-bids");
-    const asksEl = $("depth-asks");
-    const build = (items = []) =>
-      items
-        .slice(0, 10)
-        .map((entry) => {
-          const { price, qty } = normalizeDepth(entry);
-          return `<li><span class="price">${price}</span><span class="qty">${qty}</span></li>`;
-        })
-        .join("");
-    if (bidsEl) bidsEl.innerHTML = build(payload.bids);
-    if (asksEl) asksEl.innerHTML = build(payload.asks);
-  };
-
-  const normalizeTrade = (t = {}) => {
-    const side = t.side ?? (t.isBuyerMaker === true ? "SELL" : t.isBuyerMaker === false ? "BUY" : "--");
-    const tsRaw = t.timestamp ?? t.time ?? Date.now();
-    return { price: t.price ?? t.p ?? "--", qty: t.quantity ?? t.q ?? "--", side, ts: typeof tsRaw === "string" ? tsRaw : new Date(tsRaw).toISOString() };
-  };
-
-  const setTrades = (payload = []) => {
-    setText("trades-error", "");
-    const el = $("trades-list");
-    if (!el) return;
-    el.innerHTML = payload
-      .slice(0, 20)
-      .map((t) => {
-        const n = normalizeTrade(t);
-        return `<li><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="ts">${n.ts}</span></li>`;
-      })
-      .join("");
-  };
-
-  const formatAmount = (price, qty, quote) => {
-    if (quote !== undefined && quote !== null) return quote;
-    const p = Number(price);
-    const q = Number(qty);
-    return Number.isFinite(p) && Number.isFinite(q) ? (p * q).toFixed(4) : "--";
-  };
-
-  const normalizeOrder = (o = {}) => {
-    const status = (o.status ?? "--").toString().toUpperCase();
-    const price = o.price ?? o.limit_price ?? o.avg_price ?? "--";
-    const qty = o.quantity ?? o.orig_qty ?? "--";
-    const quote =
-      o.cumulative_quote_quantity ??
-      o.cum_quote_quantity ??
-      o.cumulative_quote_qty ??
-      o.cummulativeQuoteQty ??
-      undefined;
-    return {
-      side: o.side ?? "--",
-      status,
-      price,
-      qty,
-      amount: formatAmount(price, qty, quote),
-      id: o.order_id ?? o.orderId ?? "--",
-      canCancel: !["CANCELED", "FILLED", "REJECTED", "EXPIRED"].includes(status),
-    };
-  };
-
-  const setOrders = (payload = []) => {
-    setText("orders-error", "");
-    const el = $("orders-list");
-    if (!el) return;
-    const header =
-      '<li class="orders-header"><span class="id">訂單ID</span><span class="side">方向</span><span class="price">價格</span><span class="qty">數量</span><span class="amount">金額</span><span class="status">狀態</span><span class="action">操作</span></li>';
-    el.innerHTML =
-      header +
-      payload
-        .slice(0, 20)
-        .map((o) => {
-          const n = normalizeOrder(o);
-          const action = n.canCancel
-            ? `<button class="order-cancel" data-order-id="${n.id}" aria-label="取消訂單 ${n.id}">取消</button>`
-            : `<span class="status-label">${n.status}</span>`;
-          return `<li data-order-id="${n.id}"><span class="id">${n.id}</span><span class="side ${n.side === "BUY" ? "buy" : "sell"}">${n.side}</span><span class="price">${n.price}</span><span class="qty">${n.qty}</span><span class="amount">${n.amount}</span><span class="status">${n.status}</span><span class="action">${action}</span></li>`;
-        })
-        .join("");
-  };
-
-  window.dashboardUI = { setText, setPrice, setKlines, setBalances, setDepth, setTrades, setOrders };
-})();
-</file>
-
-<file path="src/app/interfaces/http/pages/templates/dashboard/index.html">
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<title>QRL/USDT Dashboard</title>
-<link rel="stylesheet" href="/static/css/dashboard.css" />
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-<a href="#maincontent" class="skip-link">Skip to content</a>
-<main id="maincontent" class="dashboard-grid">
-<div class="card price-card">
-<div class="price-row"><span class="label">買價</span><span id="bid" class="value">--</span></div>
-<div class="price-row"><span class="label">賣價</span><span id="ask" class="value">--</span></div>
-<div class="price-row"><span class="label">最新價</span><span id="last" class="value">--</span></div>
-<div class="price-row"><span class="label">更新時間</span><span id="timestamp" class="value">--</span></div>
-<div class="price-row error" id="price-error" aria-live="polite"></div>
-</div>
-<div class="card kline-card">
-<canvas id="klineChart" height="240"></canvas>
-</div>
-<div class="card depth-card">
-<h2>深度</h2>
-<div class="vertical-stack">
-<div class="label">賣盤</div>
-<ul id="depth-asks" class="depth-list"></ul>
-<div class="label">買盤</div>
-<ul id="depth-bids" class="depth-list"></ul>
-</div>
-<div class="price-row error" id="depth-error" aria-live="polite"></div>
-</div>
-<div class="card trades-card">
-<h2>近期成交</h2>
-<ul id="trades-list" class="trades-list"></ul>
-<div class="price-row error" id="trades-error" aria-live="polite"></div>
-</div>
-<div class="card orders-card">
-<h2>我的訂單</h2>
-<ul id="orders-list" class="orders-list"></ul>
-<div class="price-row error" id="orders-error" aria-live="polite"></div>
-</div>
-<div class="card balance-card">
-<h2>餘額</h2>
-<div class="price-row"><span class="label">QRL 可用</span><span id="bal-qrl-free" class="value">--</span></div>
-<div class="price-row"><span class="label">QRL 凍結</span><span id="bal-qrl-locked" class="value">--</span></div>
-<div class="price-row"><span class="label">USDT 可用</span><span id="bal-usdt-free" class="value">--</span></div>
-<div class="price-row"><span class="label">USDT 凍結</span><span id="bal-usdt-locked" class="value">--</span></div>
-<div class="price-row error" id="balance-error" aria-live="polite"></div>
-</div>
-<div class="card order-card">
-<h2>下單</h2>
-<form id="orderForm">
-<div class="form-row">
-<label>方向</label>
-<div class="side-toggle" role="group" aria-label="Side">
-<button type="button" data-side="BUY" class="side-btn active">買入</button>
-<button type="button" data-side="SELL" class="side-btn">賣出</button>
-</div>
-<input type="hidden" name="side" value="BUY" />
-</div>
-<div class="form-row">
-<label>類型</label>
-<select name="order_type">
-<option value="LIMIT">LIMIT</option>
-<option value="MARKET">MARKET</option>
-</select>
-</div>
-<div class="form-row">
-<label>數量</label>
-<input name="quantity" type="number" step="0.0001" required />
-</div>
-<div class="form-row">
-<label>價格</label>
-<input name="price" type="number" step="0.0001" />
-</div>
-<div class="form-row">
-<label>有效期限</label>
-<select name="time_in_force">
-<option value="GTC">GTC</option>
-<option value="IOC">IOC</option>
-<option value="FOK">FOK</option>
-</select>
-</div>
-<button type="submit">送出</button>
-<div id="orderResult" class="order-result"></div>
-</form>
-</div>
-</main>
-<script id="dashboard-config" type="application/json">{{ dashboard_config | tojson }}</script>
-<script src="/static/js/pages/dashboard-config.js" defer></script>
-<script src="/static/js/domain/order.js" defer></script>
-<script src="/static/js/pages/dashboard-renderers.js" defer></script>
-<script src="/static/js/pages/dashboard.js" defer></script>
-</body>
-</html>
-</file>
-
 <file path="src/app/interfaces/http/schemas.py">
 """Pydantic schemas for interface layer requests/responses."""
 
@@ -5214,133 +5344,6 @@ class AllocationResponse(BaseModel):
     expected_fill: Decimal | None = Field(
         default=None, description="Expected fill quantity based on current depth"
     )
-</file>
-
-<file path="src/app/interfaces/http/pages/static/js/pages/dashboard.js">
-(() => {
-  const cfg = window.dashboardConfig || {};
-  const ui = window.dashboardUI || {};
-  if (!ui.setPrice || !ui.setText) return;
-
-  const load = async (url) => {
-    const resp = await fetch(url);
-    let data = {};
-    try {
-      data = await resp.json();
-    } catch (_err) {
-      data = {};
-    }
-    return { ok: resp.ok, data };
-  };
-
-  const err = (id, detail, fallback) => ui.setText(id, detail || fallback);
-
-  async function refresh() {
-    try {
-      const [price, kline, bal, depth, trades, orders] = await Promise.all([
-        load(cfg.priceUrl),
-        load(cfg.klineUrl),
-        load(cfg.balanceUrl),
-        load(cfg.depthUrl),
-        load(cfg.tradesUrl),
-        load(cfg.ordersUrl),
-      ]);
-      price.ok ? ui.setPrice(price.data) : err("price-error", price.data.detail, "價格取得失敗");
-      kline.ok && ui.setKlines(kline.data);
-      bal.ok ? ui.setBalances(bal.data) : err("balance-error", bal.data.detail, "餘額取得失敗");
-      depth.ok ? ui.setDepth(depth.data) : err("depth-error", depth.data.detail, "Depth 取得失敗");
-      trades.ok ? ui.setTrades(trades.data) : err("trades-error", trades.data.detail, "Trades 取得失敗");
-      orders.ok ? ui.setOrders(orders.data) : err("orders-error", orders.data.detail, "Orders 取得失敗");
-    } catch (ex) {
-      ["price", "balance", "depth", "trades", "orders"].forEach((key) => err(`${key}-error`, null, "連線錯誤"));
-      console.error(ex);
-    }
-  }
-
-  const wireSideToggle = () => {
-    document.querySelectorAll(".side-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll(".side-btn").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        const sideInput = document.querySelector('input[name="side"]');
-        if (sideInput) sideInput.value = btn.dataset.side;
-      });
-    });
-  };
-
-  const wireOrderForm = () => {
-    const form = document.getElementById("orderForm");
-    const resultEl = document.getElementById("orderResult");
-    if (!form || !resultEl) return;
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const payload = {
-        symbol: "QRLUSDT",
-        side: form.side.value,
-        order_type: form.order_type.value,
-        quantity: form.quantity.value,
-        price: form.price.value || null,
-        time_in_force: form.time_in_force.value,
-      };
-      resultEl.textContent = "送出中...";
-      try {
-        const resp = await fetch(cfg.orderUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const data = await resp.json().catch(() => ({}));
-        resultEl.textContent = resp.ok
-          ? `成功: orderId=${data.order_id || data.orderId || "N/A"}`
-          : `失敗: ${data.detail || JSON.stringify(data)}`;
-      } catch (ex) {
-        resultEl.textContent = `錯誤: ${ex}`;
-      }
-    });
-  };
-
-  const cancelOrder = async (orderId, button) => {
-    if (!orderId || !cfg.ordersUrl) return;
-    const url = `${cfg.ordersUrl}/${encodeURIComponent(orderId)}/cancel`;
-    const originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = "取消中...";
-    try {
-      const resp = await fetch(url, { method: "POST" });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok) {
-        err("orders-error", data.detail, "取消失敗");
-      } else {
-        ui.setText("orders-error", "");
-        refresh();
-      }
-    } catch (ex) {
-      err("orders-error", String(ex), "取消失敗");
-    } finally {
-      button.disabled = false;
-      button.textContent = originalText || "取消";
-    }
-  };
-
-  const wireOrderActions = () => {
-    const list = document.getElementById("orders-list");
-    if (!list) return;
-    list.addEventListener("click", (event) => {
-      const button = event.target.closest(".order-cancel");
-      if (!button) return;
-      const orderId = button.dataset.orderId;
-      cancelOrder(orderId, button);
-    });
-  };
-
-  document.addEventListener("DOMContentLoaded", () => {
-    wireSideToggle();
-    wireOrderForm();
-    wireOrderActions();
-    refresh();
-    setInterval(refresh, cfg.refreshMs || 10000);
-  });
-})();
 </file>
 
 <file path="src/app/interfaces/tasks/entrypoints.py">
