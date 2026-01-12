@@ -1,1 +1,1 @@
-User request: Analyze current /tasks/allocation chain. Explain order placement logic and quantity calculation. Propose optimizations to minimize atomic order amount to avoid detection and reduce long-lived orders. Provide design in RP.
+User request: Analyze current /tasks/allocation chain. Explain order placement logic and quantity calculation. Propose optimizations to minimize atomic order amount to avoid detection and reduce long-lived orders. Provide design in PR.

@@ -19,7 +19,7 @@ post_date: "2026-01-12"
   - Mid price = (bid + ask) / 2 from `get_price`.
 - Decision:
   - Normalize balances into USDT terms via `ValuationService`.
-  - `BalanceComparisonRule` with tolerance 0.01: skip if |qrl_usdt - usdt| ≤ tolerance; else pick side (SELL if QRL heavier, BUY otherwise).
+  - `BalanceComparisonRule` with tolerance 0.01 USDT: skip if |qrl_usdt - usdt| ≤ tolerance; else pick side (SELL if QRL heavier, BUY otherwise).
 - Market check:
   - Fetch depth (limit 20).
   - `DepthCalculator` computes executable size/weighted price for target quantity = 1.
@@ -43,12 +43,18 @@ post_date: "2026-01-12"
 
 ## Optimization proposal — minimal, short-lived slices
 ### 1) Atomic size policy
-- Source min_notional and lot/step size from exchange metadata (or config); derive `min_qty = max(step, min_notional / best_price)`.
-- Compute imbalance_notional = |qrl_value - usdt_value|; target slice = clamp(imbalance_notional * slice_pct, min_qty, max_slice_notional / best_price).
+- Source min_notional and lot/step size from exchange metadata (or config). If either is missing or best_price ≤ 0, skip placing an order. Otherwise derive a stepped quantity:
+  - raw_qty = min_notional / best_price
+  - stepped_qty = ceil(raw_qty / step) * step
+  - min_qty = max(step, stepped_qty)
+  - step defaults to the smallest allowed lot increment (e.g., 0.0001 QRL) when metadata is absent.
+- Compute imbalance_notional = |qrl_value - usdt_value|; target slice = clamp(imbalance_notional * slice_pct, min_qty, max_slice_notional / best_price) after the same guard.
 - Apply random jitter (e.g., 0.9–1.2) and quantize to lot step to avoid a repeatable footprint.
 
 ### 2) Execution to avoid resting
-- Prefer `IOC` for micro taker sweeps when imbalance is small; set limit at best ask (BUY) / best bid (SELL) ± tiny epsilon to fill immediately.
+- Prefer `IOC` for micro taker sweeps when imbalance is small; set limit at best ask (BUY) / best bid (SELL) ± a defined epsilon. Use `max(one_tick, 0.01% of spread, absolute_minimum_epsilon)` where:
+  - one_tick = symbol tick size from metadata (fallback 0.0001 if unknown)
+  - absolute_minimum_epsilon = hard floor like 1e-6 to avoid zero when spreads collapse
 - If maker placement is required, keep `GTC` but attach a short TTL (e.g., 5–15s) and auto-cancel/resubmit with fresh depth instead of letting it rest.
 - Cap attempts per run (e.g., 2–3 slices) and stop if depth thins or slippage > threshold.
 
@@ -58,7 +64,7 @@ post_date: "2026-01-12"
 - Log emitted slices (size, tif, ttl, slippage) for monitoring and future tuning.
 
 ### Implementation sketch
-- New config knobs: `MIN_NOTIONAL_USDT`, `LOT_STEP`, `MAX_SLICE_NOTIONAL`, `SIZE_JITTER_PCT`, `ORDER_TTL_SECONDS`, `TIF_MODE` (IOC vs short-lived GTC).
+- New config knobs: `MIN_NOTIONAL_USDT`, `LOT_STEP`, `MAX_SLICE_NOTIONAL`, `SIZE_JITTER_PCT`, `ORDER_TTL_SECONDS`, `EXECUTION_MODE` enum (e.g., `IMMEDIATE_OR_CANCEL` vs `SHORT_LIVED_MAKER`) for type safety.
 - Add helper `compute_slice_quantity(mid_price, imbalance)` to replace the fixed `TARGET_QUANTITY`.
 - Switch time in force to IOC for taker-style slices; for maker flow, schedule cancel after TTL (or use a post-only + cancel timer if supported).
 - Keep existing slippage/depth checks but evaluate them per-slice; stop early on repeated rejection to avoid signaling.
