@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from src.app.application.ports.exchange_service import ExchangeServiceFactory, PlaceOrderRequest
 from src.app.application.trading.use_cases.place_order import _serialize_order
 from src.app.domain.value_objects.order_type import OrderType
@@ -21,13 +23,18 @@ class PlaceQrlOrder:
         *,
         side: str,
         order_type: str,
-        price: QrlPrice | None,
-        quantity: QrlQuantity,
+        price: Decimal | str | float | QrlPrice | None,
+        quantity: Decimal | str | int | float | QrlQuantity,
         time_in_force: str | None = "GTC",
         client_order_id: str | None = None,
     ) -> dict:
-        price_vo = Price.from_single(price.value) if price else None
-        quantity_vo = Quantity(quantity.value)
+        price_vo = None
+        if price is not None:
+            normalized_price = price if isinstance(price, QrlPrice) else QrlPrice(price)
+            price_vo = Price.from_single(normalized_price.value)
+
+        normalized_qty = quantity if isinstance(quantity, QrlQuantity) else QrlQuantity(quantity)
+        quantity_vo = Quantity(normalized_qty.value)
         request = PlaceOrderRequest(
             symbol=Symbol("QRLUSDT"),
             side=Side(side),
