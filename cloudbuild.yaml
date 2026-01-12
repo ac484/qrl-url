@@ -31,6 +31,9 @@ steps:
       - '--region=asia-southeast1'
       - '--platform=managed'
       - '--allow-unauthenticated'
+      # VPC Connector settings
+      - '--vpc-connector=qrl-run-connector'
+      - '--vpc-egress=all-traffic'
       # Resource limits
       - '--memory=512Mi'
       - '--cpu=1'
